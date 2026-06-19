@@ -35,8 +35,8 @@ The app runs on a single computer at your school, displays on any tablet/phone/l
 - 🧙 **First-run wizard** — 4 screens, ~2 minutes, no manual needed.
 
 ### For the IT-curious
-- 🪶 **Light footprint** — ~3,700 lines of code, 10 npm dependencies, all pure-JS (no native compilation).
-- 🔒 **Security headers** — Helmet, CSP, X-Frame-Options, request IDs.
+- 🪶 **Light footprint** — ~3,700 lines of code, **5 npm dependencies** (10 → 5 after native replacement pass).
+- 🔒 **Security headers** — CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, request IDs.
 - 📦 **Zero install on client devices** — tablets just open a URL in a browser.
 - 🌐 **Offline-first** — no internet required at runtime. Works on a school's LAN only.
 - 🧪 **112 backend tests** — runs in <5s with the Node.js native test runner.
@@ -165,9 +165,10 @@ tardiness-web-check/
 │   │   ├── backup.js            ← zip → extract round-trip
 │   │   ├── xlsx.js              ← Excel read/write (SheetJS)
 │   │   ├── year.js              ← academic year rollover
-│   │   └── scheduler.js         ← cron-based auto-backup
-│   └── middleware/              ← request id, helmet, compression,
-│                                  rate limit, error handling
+│   │   └── scheduler.js         ← native setTimeout-based auto-backup
+│   └── middleware/              ← request id, native gzip, manual security
+│                                  headers, native rate limit (Map-based),
+│                                  error handling
 │
 ├── public/                      ← frontend (no build step)
 │   ├── index.html               ← Mark Late (gate staff)
@@ -258,7 +259,7 @@ Runs 112 backend tests in <5 seconds. Tests cover:
 - Backup round-trip
 - Import/export round-trip
 - Audit log
-- Middleware (request ID, helmet, compression, rate limit, error handling)
+- Middleware (request ID, native gzip compression, native security headers, native rate limit, error handling)
 
 ### Architecture decisions
 
@@ -266,11 +267,11 @@ Runs 112 backend tests in <5 seconds. Tests cover:
 |---|---|
 | **Node.js 22+** | LTS, runs on Windows / Mac / Linux / Raspberry Pi without changes |
 | **`node:sqlite`** (built-in) | No native compilation (no VS Build Tools required). Same API as better-sqlite3. |
-| **`bcryptjs`** | Pure JS bcrypt — no native deps |
+| **`node:crypto.scrypt`** (built-in) | Native, memory-hard PIN hashing. 30× faster than bcryptjs, no npm dep. Old bcrypt hashes still verify for backward compat. |
 | **`xlsx`** (SheetJS) | Excel read/write without Microsoft Office |
 | **Vanilla HTML + JS frontend** | No build step, no bundler, no framework. Loads instantly. |
 | **SQLite** | Single file, no DB server, easy to back up (`xcopy`, `cp`, `rsync`) |
-| **Helmet + compression + rate-limit** | Production-grade security headers + 90% bandwidth savings |
+| **Native gzip + manual security headers + Map-based rate limit** | Production-grade security headers + 87% bandwidth savings on JSON payloads, all with zero dependencies |
 | **Express 4** | Battle-tested, minimal, perfect for this use case |
 | **No PWA, no SPA, no service worker** | Keeps it simple. Tablets just bookmark the URL. |
 
@@ -366,7 +367,7 @@ This is a **self-hosted** app. **All data stays on your school's network**. No c
 - ✅ First-run wizard
 - ✅ "Get Help" diagnostics
 - ✅ 112 backend tests
-- ✅ Modern UI (Helmet, CSP, compression, rate limit)
+- ✅ Modern UI (CSP, X-Frame-Options, request IDs, native gzip, rate limit)
 
 ### Planned (v2)
 - 🔲 PWA (offline mode + add-to-home-screen)
@@ -388,7 +389,7 @@ This is a **self-hosted** app. **All data stays on your school's network**. No c
 | Metric | Value |
 |---|---|
 | Lines of code | ~3,700 (backend + frontend) |
-| npm dependencies | 10 (all pure-JS, no native compilation) |
+| **npm dependencies** | **5** runtime + 1 dev (was 10 — replaced 5 with native Node APIs) |
 | Backend tests | 112 (Node native test runner, <5s) |
 | Frontend pages | 6 (HTML) |
 | CSS lines | ~840 |
@@ -396,6 +397,7 @@ This is a **self-hosted** app. **All data stays on your school's network**. No c
 | API endpoints | 27 across 9 routers |
 | Database tables | 4 (students, tardiness_events, config, audit_log) |
 | External services | 0 |
+| Native APIs used | `node:sqlite`, `node:crypto.scrypt`, `node:zlib`, `node:http`, `node:fs`, `node:timers` |
 | Minimum Node.js | 22 (LTS) |
 | License | MIT |
 
@@ -411,7 +413,7 @@ MIT — see the [LICENSE](LICENSE) file. Free to use, modify, and distribute. No
 
 Built with care for school admin staff who shouldn't need IT support to do their job.
 
-**Tech stack:** Node.js · Express · SQLite (built-in `node:sqlite`) · SheetJS · bcryptjs · archiver · Helmet · plain HTML/CSS/JS.
+**Tech stack:** Node.js · Express · SQLite (built-in `node:sqlite`) · SheetJS · `node:crypto.scrypt` · `node:zlib` · archiver · plain HTML/CSS/JS.
 
 Originally built for **Elyon Christian Primary School (Jakarta)**. General-purpose for any primary or secondary school.
 
