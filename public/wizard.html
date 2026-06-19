@@ -7,9 +7,12 @@
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-  <main class="container narrow" style="padding-top: 32px;">
-    <h1 style="margin-bottom: 4px;">Welcome to Tardiness Check</h1>
-    <p class="muted" style="margin-top: 0;">Let's set things up. This only takes a minute.</p>
+  <main class="container narrow" style="padding-top: 48px;">
+    <div style="text-align: center; margin-bottom: 24px;">
+      <div style="width: 64px; height: 64px; border-radius: 16px; background: linear-gradient(135deg, var(--c-brand), #7c3aed); display: inline-flex; align-items: center; justify-content: center; color: white; font-weight: 800; font-size: 24px; box-shadow: var(--shadow-md);">TC</div>
+      <h1 style="margin-top: 16px;">Welcome to Tardiness Check</h1>
+      <p class="muted">Let's set things up. This only takes a minute.</p>
+    </div>
 
     <div class="wizard-progress" id="progress">
       <div class="step" data-step="1"></div>
@@ -18,7 +21,7 @@
       <div class="step" data-step="4"></div>
     </div>
 
-    <div id="wizard-content" class="card"></div>
+    <div id="wizard-content" class="card fade-in"></div>
   </main>
 
   <div id="footer-mount"></div>
@@ -26,15 +29,15 @@
   <script src="/js/common.js"></script>
   <script>
     let currentStep = 1;
-    const data = { school_name: '', academic_year: '', pin: '', pin_confirm: '', recovery_code: null };
+    const data = { school_name: '', academic_year: '', pin: '', recovery_code: null };
 
     async function init() {
       try {
+        document.getElementById('footer-mount').replaceWith(Layout.renderFooter());
         const status = await API.get('/api/wizard/status');
         if (status.completed) { window.location.href = '/'; return; }
         if (status.has_school) data.school_name = (await API.get('/api/config')).school_name || '';
         if (status.has_year) data.academic_year = (await API.get('/api/config')).academic_year || '';
-        // Skip to next incomplete step
         if (status.has_school) currentStep = 2;
         if (status.has_year) currentStep = 3;
         if (status.has_pin) currentStep = 4;
@@ -42,12 +45,14 @@
       } catch (e) {
         toast({ message: 'Could not load wizard status: ' + e.message, type: 'error' });
       }
-      document.getElementById('footer-mount').replaceWith(Layout.renderFooter());
     }
 
     function render() {
       updateProgress();
       const c = document.getElementById('wizard-content');
+      c.classList.remove('fade-in');
+      void c.offsetWidth;  // restart animation
+      c.classList.add('fade-in');
       if (currentStep === 1) renderStep1(c);
       else if (currentStep === 2) renderStep2(c);
       else if (currentStep === 3) renderStep3(c);
@@ -63,15 +68,22 @@
       });
     }
 
+    function stepHeader(iconName, title, subtitle) {
+      return `
+        <div class="wizard-step-icon">${icon(iconName, 36)}</div>
+        <h2 style="text-align: center; margin-bottom: 8px;">${title}</h2>
+        <p class="muted" style="text-align: center; margin-bottom: 20px;">${subtitle}</p>
+      `;
+    }
+
     // ===== Step 1: School name =====
     function renderStep1(c) {
       c.innerHTML = `
-        <h2>1. What's your school called?</h2>
-        <p class="muted">This appears in the top bar of every page.</p>
-        <label for="school">School name</label>
+        ${stepHeader('school', 'What\'s your school called?', 'This appears in the top bar of every page.')}
+        <label>School name</label>
         <input id="school" type="text" value="${escapeHtml(data.school_name)}" placeholder="e.g. Elyon Christian Primary School" autofocus>
-        <div class="modal-actions">
-          <button class="primary big" id="next">Next</button>
+        <div class="modal-actions" style="justify-content: flex-end;">
+          <button class="primary big" id="next">Next ${icon('chevronRight', 16)}</button>
         </div>
       `;
       document.getElementById('school').focus();
@@ -79,9 +91,10 @@
         const v = document.getElementById('school').value.trim();
         if (!v) return toast({ message: 'Please enter a school name', type: 'error' });
         data.school_name = v;
-        await API.post('/api/wizard/step/school', { school_name: v });
-        currentStep = 2;
-        render();
+        try {
+          await API.post('/api/wizard/step/school', { school_name: v });
+          currentStep = 2; render();
+        } catch (e) { toast({ message: e.message, type: 'error' }); }
       });
       document.getElementById('school').addEventListener('keydown', e => {
         if (e.key === 'Enter') document.getElementById('next').click();
@@ -90,56 +103,57 @@
 
     // ===== Step 2: Academic year =====
     function renderStep2(c) {
-      const suggestions = [];
       const now = new Date();
       const y = now.getFullYear();
       const m = now.getMonth();
-      // If July-December, current year is start; else previous year
       const startYear = m >= 6 ? y : y - 1;
+      const suggestions = [];
       for (let i = -1; i <= 2; i++) {
         suggestions.push(`${startYear + i}/${startYear + i + 1}`);
       }
       c.innerHTML = `
-        <h2>2. What academic year is it?</h2>
-        <p class="muted">Format: YYYY/YYYY (e.g. ${suggestions[1]})</p>
+        ${stepHeader('calendar', 'What academic year is it?', 'Format: YYYY/YYYY (e.g. ${suggestions[1]})')}
         <div class="wizard-options" id="year-options">
           ${suggestions.map(y => `<div class="wizard-option" data-year="${y}">${y}</div>`).join('')}
         </div>
-        <label for="year" style="margin-top: 12px;">Or type a custom year</label>
+        <label style="margin-top: 16px;">Or type a custom year</label>
         <input id="year" type="text" value="${escapeHtml(data.academic_year || suggestions[1])}" placeholder="YYYY/YYYY" pattern="\\d{4}/\\d{4}">
-        <div class="modal-actions">
-          <button id="back">Back</button>
-          <button class="primary big" id="next">Next</button>
+        <div class="modal-actions" style="justify-content: space-between;">
+          <button id="back">${icon('chevronRight', 16).replace('polyline points="9 18 15 12 9 6"', 'polyline points="15 18 9 12 15 6"')} Back</button>
+          <button class="primary big" id="next">Next ${icon('chevronRight', 16)}</button>
         </div>
       `;
       document.querySelectorAll('#year-options .wizard-option').forEach(el => {
         el.addEventListener('click', () => {
+          document.querySelectorAll('.wizard-option').forEach(o => o.classList.remove('selected'));
+          el.classList.add('selected');
           document.getElementById('year').value = el.dataset.year;
         });
+        if (el.dataset.year === (data.academic_year || suggestions[1])) el.classList.add('selected');
       });
       document.getElementById('back').addEventListener('click', () => { currentStep = 1; render(); });
       document.getElementById('next').addEventListener('click', async () => {
         const v = document.getElementById('year').value.trim();
         if (!/^\d{4}\/\d{4}$/.test(v)) return toast({ message: 'Use format YYYY/YYYY (e.g. 2025/2026)', type: 'error' });
         data.academic_year = v;
-        await API.post('/api/wizard/step/year', { academic_year: v });
-        currentStep = 3;
-        render();
+        try {
+          await API.post('/api/wizard/step/year', { academic_year: v });
+          currentStep = 3; render();
+        } catch (e) { toast({ message: e.message, type: 'error' }); }
       });
     }
 
     // ===== Step 3: PIN =====
     function renderStep3(c) {
       c.innerHTML = `
-        <h2>3. Create an admin PIN</h2>
-        <p class="muted">You'll enter this PIN when adding students, changing settings, or making backups.</p>
-        <label for="pin">PIN (4–8 digits)</label>
-        <input id="pin" type="password" inputmode="numeric" pattern="\\d{4,8}" maxlength="8" autofocus>
-        <label for="pin2" style="margin-top: 12px;">Confirm PIN</label>
-        <input id="pin2" type="password" inputmode="numeric" pattern="\\d{4,8}" maxlength="8">
-        <div class="modal-actions">
-          <button id="back">Back</button>
-          <button class="primary big" id="next">Next</button>
+        ${stepHeader('lock', 'Create an admin PIN', 'You\'ll enter this PIN when adding students, changing settings, or making backups.')}
+        <label>New PIN (4–8 digits)</label>
+        <input id="pin" type="password" inputmode="numeric" pattern="\\d{4,8}" maxlength="8" autofocus class="huge center">
+        <label style="margin-top: 12px;">Confirm PIN</label>
+        <input id="pin2" type="password" inputmode="numeric" pattern="\\d{4,8}" maxlength="8" class="huge center">
+        <div class="modal-actions" style="justify-content: space-between;">
+          <button id="back">${icon('chevronRight', 16).replace('polyline points="9 18 15 12 9 6"', 'polyline points="15 18 9 12 15 6"')} Back</button>
+          <button class="primary big" id="next">Next ${icon('chevronRight', 16)}</button>
         </div>
       `;
       document.getElementById('pin').focus();
@@ -152,8 +166,7 @@
           const res = await API.post('/api/wizard/step/pin', { pin, pin_confirm: pin2 });
           data.recovery_code = res.recovery_code;
           data.pin = pin;
-          currentStep = 4;
-          render();
+          currentStep = 4; render();
         } catch (e) {
           toast({ message: e.message || 'Could not set PIN', type: 'error' });
         }
@@ -163,19 +176,17 @@
     // ===== Step 4: Recovery code + Finish =====
     function renderStep4(c) {
       c.innerHTML = `
-        <h2>4. Save your recovery code</h2>
-        <p class="muted"><strong>This is the ONLY way to reset your PIN if you forget it.</strong></p>
-        <p class="muted">Write it down and keep it somewhere safe (printed card, locked drawer). This is the only time we'll show it.</p>
+        ${stepHeader('shield', 'Save your recovery code', 'This is the ONLY way to reset your PIN if you forget it.')}
+        <p class="muted" style="text-align: center; margin-bottom: 12px;">Write it down, print it, or save it somewhere safe. We will only show it this one time.</p>
         <div class="recovery-code">${escapeHtml(data.recovery_code)}</div>
-        <p style="margin-top: 16px;">You can also import students now, or do it later from the Roster page.</p>
-        <div class="modal-actions">
+        <p class="muted" style="text-align: center; margin-top: 20px;">You can add students now, or do it later from the Roster page.</p>
+        <div class="modal-actions" style="justify-content: space-between; flex-wrap: wrap; gap: 12px;">
           <button id="skip">Skip — add students later</button>
-          <button id="download" class="primary big">Download template + finish</button>
+          <button id="download" class="primary big">${icon('download', 16)} Download template + finish</button>
         </div>
       `;
       document.getElementById('skip').addEventListener('click', async () => { await finishWizard(); });
       document.getElementById('download').addEventListener('click', async () => {
-        // Trigger template download then finish
         window.location.href = '/api/template?format=xlsx';
         await finishWizard();
       });

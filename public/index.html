@@ -5,23 +5,32 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <title>Tardiness Check — Mark Late</title>
   <link rel="stylesheet" href="/css/style.css">
-  <meta name="theme-color" content="#2563eb">
+  <meta name="theme-color" content="#4f46e5">
 </head>
 <body>
   <div id="topbar-mount"></div>
 
   <main class="container narrow">
-    <h2 style="margin: 8px 0 4px;">Mark a student late</h2>
-    <p class="muted">Search by name or student ID. Tap to mark.</p>
+    <div class="page-header">
+      <div>
+        <h2>Mark a student late</h2>
+        <div class="subtitle">Search by name or student ID. Tap to mark with a timestamp.</div>
+      </div>
+    </div>
 
-    <input id="search" class="large" type="search" placeholder="Type a name…" autofocus autocomplete="off">
+    <div class="search-input">
+      <span class="icon" id="search-icon"></span>
+      <input id="search" type="search" placeholder="Type a name…" autofocus autocomplete="off" class="large">
+    </div>
 
     <div id="results" class="student-results"></div>
 
     <div id="recent-section" style="margin-top: 32px;" hidden>
-      <h3 style="margin-bottom: 8px;">Recently marked</h3>
+      <div class="row between" style="margin-bottom: 12px;">
+        <h3 style="margin: 0;">Recently marked today</h3>
+        <span id="recent-count" class="muted"></span>
+      </div>
       <div id="recent" class="recent-marks"></div>
-      <button id="undo-last" class="ghost" style="margin-top: 12px;" hidden>Undo last mark</button>
     </div>
   </main>
 
@@ -32,15 +41,17 @@
     // ============ Tardiness Check page ============
 
     let allStudents = [];
-    let recentMarks = [];  // newest first
-    let lastMarked = null;  // for undo
+    let recentMarks = [];
+    let lastMarked = null;
 
     async function init() {
       try {
+        document.getElementById('search-icon').innerHTML = icon('search', 18);
         const config = await API.get('/api/config');
         const backup = await API.get('/api/health').then(h => h.backup).catch(() => null);
         const topbar = Layout.renderTopbar({ active: 'mark', schoolName: config.school_name, backup });
-        document.getElementById('topbar-mount').replaceWith(topbar);
+        const mount = document.getElementById('topbar-mount');
+        mount.replaceWith(topbar);
         topbar.id = 'topbar-mount';
       } catch (e) {
         console.error('init failed', e);
@@ -53,8 +64,13 @@
     }
 
     async function loadStudents() {
-      const res = await API.get('/api/students?limit=500');
-      allStudents = res.items;
+      try {
+        const res = await API.get('/api/students?limit=500');
+        allStudents = res.items;
+      } catch (e) {
+        // No students yet — that's OK
+        allStudents = [];
+      }
     }
 
     async function loadToday() {
@@ -74,32 +90,54 @@
           if (first) first.click();
         }
       });
+      // Keyboard shortcut: "/" focuses search
+      document.addEventListener('keydown', (e) => {
+        if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+          search.focus();
+          search.select();
+        }
+      });
       search.focus();
     }
 
     function renderResults() {
       const q = document.getElementById('search').value.trim().toLowerCase();
       const container = document.getElementById('results');
-      if (!q) { container.innerHTML = ''; return; }
+      if (!q) {
+        container.innerHTML = '';
+        return;
+      }
 
       const matches = allStudents
         .filter(s => s.full_name.toLowerCase().includes(q) || s.student_id.toLowerCase().includes(q))
         .slice(0, 20);
 
       if (matches.length === 0) {
-        container.innerHTML = '<p class="muted">No students match. Try a different name.</p>';
+        const empty = emptyState({
+          icon: 'search',
+          title: 'No matches',
+          message: `No students match "${escapeHtml(q)}". Try a different name or student ID.`,
+        });
+        container.innerHTML = '';
+        container.appendChild(empty);
         return;
       }
 
-      container.innerHTML = matches.map(s => `
-        <div class="student-tile" data-id="${s.id}" data-sid="${escapeHtml(s.student_id)}" data-name="${escapeHtml(s.full_name)}" data-class="${escapeHtml(s.class)}" data-late="${s.late_count || 0}">
-          <div class="grow">
-            <div class="name">${escapeHtml(s.full_name)}</div>
-            <div class="class-name">${escapeHtml(s.class)} · ID ${escapeHtml(s.student_id)}</div>
+      container.innerHTML = matches.map(s => {
+        const cc = classColor(s.class);
+        const initial = (s.full_name || '?').trim().charAt(0).toUpperCase();
+        return `
+          <div class="student-tile fade-in" data-id="${s.id}" data-sid="${escapeHtml(s.student_id)}" data-name="${escapeHtml(s.full_name)}" data-class="${escapeHtml(s.class)}" data-late="${s.late_count || 0}" style="--class-color:${cc}">
+            <div class="avatar">${escapeHtml(initial)}</div>
+            <div class="info">
+              <div class="name">${escapeHtml(s.full_name)}</div>
+              <div class="meta">${escapeHtml(s.class)} · ID ${escapeHtml(s.student_id)}</div>
+            </div>
+            ${lateBadge(s.late_count)}
           </div>
-          ${lateBadge(s.late_count)}
-        </div>
-      `).join('');
+        `;
+      }).join('');
 
       container.querySelectorAll('.student-tile').forEach(tile => {
         tile.addEventListener('click', () => openMarkModal(tile.dataset));
@@ -108,9 +146,20 @@
 
     function openMarkModal(data) {
       const body = document.createElement('div');
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       body.innerHTML = `
-        <p>Mark <strong>${escapeHtml(data.name)}</strong> (${escapeHtml(data.class)}) late at <strong>${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong>?</p>
-        <label for="reason">Reason (optional)</label>
+        <div class="row" style="gap: 14px; align-items: center; margin-bottom: 12px;">
+          <div class="avatar" style="background: ${classColor(data.class)}; width: 48px; height: 48px; font-size: 20px; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-weight: 700;">
+            ${escapeHtml(data.name.trim().charAt(0).toUpperCase())}
+          </div>
+          <div>
+            <div style="font-weight: 700; font-size: 17px;">${escapeHtml(data.name)}</div>
+            <div class="muted" style="font-size: 13px;">${escapeHtml(data.class)} · ID ${escapeHtml(data.sid)}</div>
+          </div>
+        </div>
+        <p style="margin: 14px 0 8px;">Mark this student <strong>late at ${timeStr}</strong>?</p>
+        <label>Reason (optional)</label>
         <select id="reason">
           <option value="">— none —</option>
           <option value="traffic">Traffic</option>
@@ -118,7 +167,9 @@
           <option value="family">Family</option>
           <option value="other">Other</option>
         </select>
-        <p class="muted faint" style="margin-top: 8px; font-size: 13px;">This student has been late <strong>${data.late}</strong> time${data.late === '1' ? '' : 's'} this academic year.</p>
+        <p class="muted" style="margin-top: 12px; font-size: 13px;">
+          This student has been late <strong>${data.late}</strong> time${data.late === '1' ? '' : 's'} this academic year.
+        </p>
       `;
       showModal({
         title: 'Confirm late mark',
@@ -137,54 +188,46 @@
       try {
         const res = await API.post('/api/tardiness', { student_id: studentId, notes, recorded_by: 'gate' });
         beep();
-        lastMarked = { id: res.id, student_id: studentId, name: data.name, ts: Date.now() };
+        lastMarked = { id: res.id, student_id: studentId, name: data.name };
         recentMarks.unshift(res);
         renderRecent();
-        // Update student late_count locally
         const s = allStudents.find(x => x.id === studentId);
         if (s) s.late_count = (s.late_count || 0) + 1;
         document.getElementById('search').value = '';
         document.getElementById('results').innerHTML = '';
         toast({
-          message: `${data.name} marked late`,
+          message: `${data.name} marked late at ${timeStr(res.occurred_at)}`,
           type: 'success',
-          duration: 6000,
-          actions: [{ label: 'Undo', onClick: undoLastMark }],
+          duration: 5000,
         });
       } catch (e) {
         toast({ message: `Could not mark: ${e.message}`, type: 'error' });
-        throw e;  // keep modal open
+        throw e;
       }
     }
 
-    async function undoLastMark() {
-      if (!lastMarked) return;
-      // The API doesn't have DELETE for events in v1, so we add a "negate" record manually
-      // For v1 we display "undo available" but actual undo requires DELETE /api/tardiness/:id
-      // Simpler: just remove from recent list and notify. A full undo can be added later.
-      toast({ message: 'Undo not yet supported — contact admin to remove a mark', duration: 5000 });
+    function timeStr(s) {
+      const m = s && s.match(/(\d{2}):(\d{2}):/);
+      return m ? `${m[1]}:${m[2]}` : '';
     }
 
     function renderRecent() {
       const sec = document.getElementById('recent-section');
       const list = document.getElementById('recent');
+      const count = document.getElementById('recent-count');
       if (!recentMarks.length) { sec.hidden = true; return; }
       sec.hidden = false;
+      count.textContent = `${recentMarks.length} event${recentMarks.length === 1 ? '' : 's'}`;
       list.innerHTML = recentMarks.slice(0, 10).map(m => `
         <div class="recent-mark">
+          ${icon('clock', 14)}
           <strong>${escapeHtml(m.full_name)}</strong>
           <span class="muted">${escapeHtml(m.class)}</span>
           <span class="spacer"></span>
-          <span class="muted">${formatTime(m.occurred_at)}</span>
+          <span class="muted">${timeStr(m.occurred_at)}</span>
           ${m.notes ? `<span class="badge">${escapeHtml(m.notes)}</span>` : ''}
         </div>
       `).join('');
-    }
-
-    function formatTime(s) {
-      // occurred_at is "YYYY-MM-DD HH:MM:SS" UTC; show HH:MM
-      const m = s && s.match(/(\d{2}):(\d{2}):/);
-      return m ? `${m[1]}:${m[2]}` : '';
     }
 
     init();

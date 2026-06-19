@@ -10,37 +10,53 @@
   <div id="topbar-mount"></div>
 
   <main class="container wide">
-    <h2 style="margin: 0 0 16px;">Reports</h2>
+    <div class="page-header">
+      <div>
+        <h2>Reports</h2>
+        <div class="subtitle" id="subtitle">Loading…</div>
+      </div>
+    </div>
 
-    <div class="stats-grid" id="stats-grid" style="margin-bottom: 24px;"></div>
+    <div class="stats-grid" id="stats-grid" style="margin-bottom: 28px;"></div>
 
     <div class="card" style="margin-bottom: 16px;">
-      <div class="row between" style="margin-bottom: 8px;">
-        <h3 style="margin: 0;">Today's tardiness</h3>
-        <span id="today-count" class="muted"></span>
+      <div class="card-header">
+        <div class="icon" id="today-icon"></div>
+        <h3>Today's tardiness</h3>
       </div>
-      <table>
-        <thead>
-          <tr><th>Time</th><th>Name</th><th>Class</th><th>Notes</th></tr>
-        </thead>
-        <tbody id="today-tbody"></tbody>
-      </table>
+      <div class="table-wrap" style="border: none; box-shadow: none;">
+        <table>
+          <thead><tr><th>Time</th><th>Name</th><th>Class</th><th>Notes</th></tr></thead>
+          <tbody id="today-tbody"></tbody>
+        </table>
+      </div>
     </div>
 
     <div class="card" style="margin-bottom: 16px;">
-      <h3 style="margin-top: 0;">By class</h3>
-      <table>
-        <thead><tr><th>Class</th><th>Students</th><th>Late events</th><th>Avg lates / student</th></tr></thead>
-        <tbody id="by-class-tbody"></tbody>
-      </table>
+      <div class="card-header">
+        <div class="icon" id="byclass-icon"></div>
+        <h3>By class</h3>
+      </div>
+      <div class="table-wrap" style="border: none; box-shadow: none;">
+        <table>
+          <thead><tr><th>Class</th><th>Students</th><th>Late events</th><th>Avg lates / student</th></tr></thead>
+          <tbody id="by-class-tbody"></tbody>
+        </table>
+      </div>
     </div>
 
     <div class="card">
-      <h3 style="margin-top: 0;">Top repeat offenders (this academic year)</h3>
-      <table>
-        <thead><tr><th>#</th><th>Name</th><th>Class</th><th>Times late</th></tr></thead>
-        <tbody id="top-tbody"></tbody>
-      </table>
+      <div class="card-header">
+        <div class="icon" id="top-icon"></div>
+        <h3>Top repeat offenders</h3>
+      </div>
+      <p class="muted" style="margin-top: -8px;">Students with the most lates this academic year.</p>
+      <div class="table-wrap" style="border: none; box-shadow: none;">
+        <table>
+          <thead><tr><th>#</th><th>Student</th><th>Class</th><th>Times late</th></tr></thead>
+          <tbody id="top-tbody"></tbody>
+        </table>
+      </div>
     </div>
   </main>
 
@@ -53,69 +69,123 @@
         const config = await API.get('/api/config');
         const backup = await API.get('/api/health').then(h => h.backup).catch(() => null);
         const topbar = Layout.renderTopbar({ active: 'reports', schoolName: config.school_name, backup });
-        document.getElementById('topbar-mount').replaceWith(topbar);
+        const mount = document.getElementById('topbar-mount');
+        mount.replaceWith(topbar);
         topbar.id = 'topbar-mount';
+        document.getElementById('today-icon').innerHTML = icon('clock', 18);
+        document.getElementById('byclass-icon').innerHTML = icon('users', 18);
+        document.getElementById('top-icon').innerHTML = icon('star', 18);
       } catch {}
       document.getElementById('footer-mount').replaceWith(Layout.renderFooter());
       await loadAll();
     }
 
     async function loadAll() {
-      const [stats, today] = await Promise.all([
-        API.get('/api/stats'),
-        API.get('/api/tardiness/today').catch(() => ({ items: [] })),
-      ]);
-      renderStats(stats);
-      renderToday(today, stats);
-      renderByClass(stats);
-      await renderTop();
+      try {
+        const [stats, today] = await Promise.all([
+          API.get('/api/stats'),
+          API.get('/api/tardiness/today').catch(() => ({ items: [] })),
+        ]);
+        document.getElementById('subtitle').textContent = `Academic year ${stats.academic_year}`;
+        renderStats(stats);
+        renderToday(today, stats);
+        renderByClass(stats);
+        await renderTop();
+      } catch (e) {
+        document.getElementById('subtitle').textContent = 'Could not load reports.';
+      }
     }
 
     function renderStats(s) {
       const g = document.getElementById('stats-grid');
       g.innerHTML = `
-        <div class="stat-card"><div class="stat-value">${s.total_active_students}</div><div class="stat-label">Active students</div></div>
-        <div class="stat-card"><div class="stat-value">${s.today_count}</div><div class="stat-label">Late today</div></div>
-        <div class="stat-card"><div class="stat-value">${s.total_events_this_year}</div><div class="stat-label">Lates this year</div></div>
-        <div class="stat-card"><div class="stat-value">${s.academic_year}</div><div class="stat-label">Academic year</div></div>
+        <div class="stat-card accent">
+          <div class="stat-icon">${icon('clock', 20)}</div>
+          <div class="stat-value">${s.today_count}</div>
+          <div class="stat-label">Late today</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">${icon('users', 20)}</div>
+          <div class="stat-value">${s.total_active_students}</div>
+          <div class="stat-label">Active students</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">${icon('calendar', 20)}</div>
+          <div class="stat-value">${s.total_events_this_year}</div>
+          <div class="stat-label">Lates this year</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">${icon('school', 20)}</div>
+          <div class="stat-value" style="font-size: 20px;">${escapeHtml(s.academic_year)}</div>
+          <div class="stat-label">Academic year</div>
+        </div>
       `;
     }
 
-    function renderToday(today, stats) {
-      document.getElementById('today-count').textContent = `${today.total || 0} event${today.total === 1 ? '' : 's'}`;
+    function renderToday(today) {
       const tbody = document.getElementById('today-tbody');
       if (!today.items || !today.items.length) {
-        tbody.innerHTML = '<tr><td colspan="4" class="muted center">No one marked late today.</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="4" style="padding: 0; border: none;">
+          <div class="empty-state" style="padding: 40px 24px;">
+            <div class="empty-icon">${icon('check', 32)}</div>
+            <h3>No one marked late today</h3>
+            <p>Great day so far!</p>
+          </div>
+        </td></tr>`;
         return;
       }
-      tbody.innerHTML = today.items.map(e => `
-        <tr>
-          <td>${formatTime(e.occurred_at)}</td>
-          <td><strong>${escapeHtml(e.full_name)}</strong></td>
-          <td>${escapeHtml(e.class)}</td>
-          <td>${e.notes ? escapeHtml(e.notes) : '<span class="faint">—</span>'}</td>
-        </tr>
-      `).join('');
+      tbody.innerHTML = today.items.map(e => {
+        const cc = classColor(e.class);
+        const initial = (e.full_name || '?').trim().charAt(0).toUpperCase();
+        return `
+          <tr>
+            <td><span class="muted">${timeStr(e.occurred_at)}</span></td>
+            <td>
+              <div class="row" style="gap: 10px;">
+                <div class="avatar" style="background:${cc}; width: 28px; height: 28px; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px;">${escapeHtml(initial)}</div>
+                <strong>${escapeHtml(e.full_name)}</strong>
+              </div>
+            </td>
+            <td>${escapeHtml(e.class)}</td>
+            <td>${e.notes ? `<span class="badge">${escapeHtml(e.notes)}</span>` : '<span class="faint">—</span>'}</td>
+          </tr>
+        `;
+      }).join('');
     }
 
     function renderByClass(stats) {
       const tbody = document.getElementById('by-class-tbody');
       if (!stats.per_class.length) {
-        tbody.innerHTML = '<tr><td colspan="4" class="muted center">No active students.</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="4" style="padding: 0; border: none;">
+          <div class="empty-state" style="padding: 40px 24px;">
+            <div class="empty-icon">${icon('users', 32)}</div>
+            <h3>No active students</h3>
+          </div>
+        </td></tr>`;
         return;
       }
-      tbody.innerHTML = stats.per_class.map(c => `
-        <tr>
-          <td><strong>${escapeHtml(c.class)}</strong></td>
-          <td>${c.student_count}</td>
-          <td>${c.event_count}</td>
-          <td>${c.avg_lates_per_student}</td>
-        </tr>
-      `).join('');
+      const maxEvents = Math.max(...stats.per_class.map(c => c.event_count), 1);
+      tbody.innerHTML = stats.per_class.map(c => {
+        const pct = Math.round((c.event_count / maxEvents) * 100);
+        return `
+          <tr>
+            <td><strong>${escapeHtml(c.class)}</strong></td>
+            <td>${c.student_count}</td>
+            <td>${c.event_count}</td>
+            <td>
+              <div class="row" style="gap: 10px;">
+                <div style="flex: 1; height: 6px; background: var(--c-surface-3); border-radius: 999px; overflow: hidden; min-width: 80px;">
+                  <div style="height: 100%; width: ${pct}%; background: var(--c-brand); border-radius: 999px;"></div>
+                </div>
+                <span class="muted" style="min-width: 28px;">${c.avg_lates_per_student}</span>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
     }
 
     async function renderTop() {
-      // Get all students with late_count, sort desc
       const res = await API.get('/api/students?limit=500&includeInactive=1');
       const top = res.items
         .filter(s => s.late_count > 0)
@@ -123,20 +193,35 @@
         .slice(0, 10);
       const tbody = document.getElementById('top-tbody');
       if (!top.length) {
-        tbody.innerHTML = '<tr><td colspan="4" class="muted center">No tardiness recorded yet.</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="4" style="padding: 0; border: none;">
+          <div class="empty-state" style="padding: 40px 24px;">
+            <div class="empty-icon">${icon('star', 32)}</div>
+            <h3>No tardiness recorded yet</h3>
+            <p>Once students start getting marked late, the top repeat offenders will appear here.</p>
+          </div>
+        </td></tr>`;
         return;
       }
-      tbody.innerHTML = top.map((s, i) => `
-        <tr>
-          <td>${i + 1}</td>
-          <td><strong>${escapeHtml(s.full_name)}</strong></td>
-          <td>${escapeHtml(s.class)}</td>
-          <td>${lateBadge(s.late_count)}</td>
-        </tr>
-      `).join('');
+      tbody.innerHTML = top.map((s, i) => {
+        const cc = classColor(s.class);
+        const initial = (s.full_name || '?').trim().charAt(0).toUpperCase();
+        return `
+          <tr>
+            <td><strong style="color: ${i < 3 ? 'var(--c-warning)' : 'var(--c-text-muted)'};">#${i + 1}</strong></td>
+            <td>
+              <div class="row" style="gap: 10px;">
+                <div class="avatar" style="background:${cc}; width: 28px; height: 28px; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px;">${escapeHtml(initial)}</div>
+                <strong>${escapeHtml(s.full_name)}</strong>
+              </div>
+            </td>
+            <td>${escapeHtml(s.class)}</td>
+            <td>${lateBadge(s.late_count)}</td>
+          </tr>
+        `;
+      }).join('');
     }
 
-    function formatTime(s) {
+    function timeStr(s) {
       const m = s && s.match(/(\d{2}):(\d{2}):/);
       return m ? `${m[1]}:${m[2]}` : '';
     }

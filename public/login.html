@@ -7,62 +7,105 @@
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-  <main class="container narrow" style="padding-top: 64px;">
-    <div class="card" style="text-align: center;">
-      <h1 style="margin-top: 0;">Enter admin PIN</h1>
-      <p class="muted">Required to manage students, change settings, or make backups.</p>
-
-      <label for="pin" style="margin-top: 16px;">PIN</label>
-      <input id="pin" type="password" inputmode="numeric" pattern="\d{4,8}" maxlength="8" autofocus style="text-align: center; font-size: 24px; letter-spacing: 8px;">
-
-      <div id="error" class="error hidden" style="margin-top: 12px;"></div>
-
-      <button id="login" class="primary big" style="width: 100%; margin-top: 16px;">Log in</button>
-
-      <p style="margin-top: 24px;"><a href="#" id="forgot">Forgot PIN? Use recovery code</a></p>
+  <main class="container narrow" style="padding-top: 80px;">
+    <div style="text-align: center; margin-bottom: 24px;">
+      <div style="width: 64px; height: 64px; border-radius: 16px; background: linear-gradient(135deg, var(--c-brand), #7c3aed); display: inline-flex; align-items: center; justify-content: center; color: white; font-weight: 800; font-size: 24px; box-shadow: var(--shadow-md);">TC</div>
+      <h1 style="margin-top: 16px;">Welcome back</h1>
+      <p class="muted">Enter your admin PIN to continue.</p>
     </div>
 
-    <div id="footer-mount"></div>
+    <div class="card" style="text-align: center;">
+      <label style="margin-bottom: 12px;">Admin PIN</label>
+      <div class="pin-display" id="pin-display"></div>
+      <input id="pin" type="password" inputmode="numeric" pattern="\d{4,8}" maxlength="8" autofocus style="position: absolute; opacity: 0; pointer-events: none;">
+
+      <div id="error" class="error-text hidden" style="margin-top: 12px; font-size: 14px;"></div>
+
+      <button id="login" class="primary big block" style="margin-top: 20px;">Log in</button>
+
+      <p style="margin-top: 20px;"><a href="#" id="forgot" style="font-size: 14px;">Forgot PIN? Use recovery code</a></p>
+    </div>
   </main>
+
+  <div id="footer-mount"></div>
 
   <script src="/js/common.js"></script>
   <script>
-    document.getElementById('pin').addEventListener('keydown', e => {
-      if (e.key === 'Enter') document.getElementById('login').click();
-    });
+    const PIN_LEN = 6;
+    let pinValue = '';
+    const dots = [];
+    const dotContainer = document.getElementById('pin-display');
+    for (let i = 0; i < PIN_LEN; i++) {
+      const dot = document.createElement('div');
+      dot.className = 'pin-dot';
+      dotContainer.appendChild(dot);
+      dots.push(dot);
+    }
 
-    document.getElementById('login').addEventListener('click', async () => {
-      const pin = document.getElementById('pin').value;
-      if (!/^\d{4,8}$/.test(pin)) {
-        showError('PIN must be 4-8 digits');
-        return;
-      }
-      Auth.setPin(pin);
-      const ok = await Auth.pingPin();
-      if (ok) {
-        toast({ message: 'Logged in', type: 'success', duration: 1500 });
-        setTimeout(() => { window.location.href = '/index.html'; }, 500);
-      } else {
-        Auth.setPin('');
-        showError('Wrong PIN. Try again.');
-        document.getElementById('pin').value = '';
-        document.getElementById('pin').focus();
-      }
-    });
+    const pinInput = document.getElementById('pin');
+    pinInput.focus();
 
+    function updateDots() {
+      dots.forEach((d, i) => {
+        d.classList.toggle('filled', i < pinValue.length);
+      });
+    }
+    function clearError() {
+      document.getElementById('error').classList.add('hidden');
+      dots.forEach(d => d.classList.remove('error'));
+    }
     function showError(msg) {
       const e = document.getElementById('error');
       e.textContent = msg;
       e.classList.remove('hidden');
+      dots.forEach(d => d.classList.add('error'));
+      setTimeout(() => dots.forEach(d => d.classList.remove('error')), 500);
     }
+
+    pinInput.addEventListener('input', () => {
+      pinValue = pinInput.value.replace(/\D/g, '').slice(0, PIN_LEN);
+      pinInput.value = pinValue;
+      updateDots();
+      clearError();
+      if (pinValue.length >= 4) tryLogin();
+    });
+
+    pinInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && pinValue.length >= 4) tryLogin();
+    });
+
+    // Tap on the dots → focus the hidden input
+    dotContainer.addEventListener('click', () => pinInput.focus());
+
+    async function tryLogin() {
+      if (!/^\d{4,8}$/.test(pinValue)) {
+        showError('PIN must be 4-8 digits');
+        return;
+      }
+      Auth.setPin(pinValue);
+      const ok = await Auth.pingPin();
+      if (ok) {
+        toast({ message: 'Logged in', type: 'success', duration: 1200 });
+        setTimeout(() => { window.location.href = '/index.html'; }, 400);
+      } else {
+        Auth.setPin('');
+        showError('Wrong PIN. Try again.');
+        pinValue = '';
+        pinInput.value = '';
+        updateDots();
+        pinInput.focus();
+      }
+    }
+
+    document.getElementById('login').addEventListener('click', tryLogin);
 
     document.getElementById('forgot').addEventListener('click', (e) => {
       e.preventDefault();
       const body = document.createElement('div');
       body.innerHTML = `
-        <p>Enter your recovery code and choose a new PIN.</p>
-        <label>Recovery code (XXXX-XXXX-XXXX-XXXX)</label>
-        <input id="rc" placeholder="XXXX-XXXX-XXXX-XXXX" style="text-transform: uppercase;">
+        <p>Enter your recovery code (XXXX-XXXX-XXXX-XXXX) and choose a new PIN.</p>
+        <label>Recovery code</label>
+        <input id="rc" placeholder="XXXX-XXXX-XXXX-XXXX" style="text-transform: uppercase; font-family: monospace;">
         <label style="margin-top: 12px;">New PIN</label>
         <input id="np" type="password" inputmode="numeric" maxlength="8">
         <label style="margin-top: 12px;">Confirm new PIN</label>
@@ -80,8 +123,11 @@
             if (np !== np2) throw new Error('PINs do not match');
             const res = await API.post('/api/wizard/reset-pin', { recovery_code: rc, pin: np, pin_confirm: np2 });
             Auth.setPin(np);
-            toast({ message: 'PIN reset. New recovery code: ' + res.recovery_code, type: 'success', duration: 8000 });
-            setTimeout(() => { window.location.href = '/'; }, 1500);
+            showModal({
+              title: 'PIN reset',
+              body: `<p>Your new recovery code is shown below. Save it — it's the only way to reset your PIN next time.</p><div class="recovery-code" style="margin-top: 12px;">${res.recovery_code}</div>`,
+              actions: [{ label: 'Done', class: 'primary', onClick: () => { window.location.href = '/'; } }],
+            });
           }},
         ],
       });

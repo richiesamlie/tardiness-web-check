@@ -10,38 +10,60 @@
   <div id="topbar-mount"></div>
 
   <main class="container narrow">
-    <h2 style="margin: 0 0 16px;">Settings</h2>
+    <div class="page-header">
+      <div>
+        <h2>Settings</h2>
+        <div class="subtitle">School configuration, backups, and admin tools.</div>
+      </div>
+    </div>
 
     <div class="card" style="margin-bottom: 16px;">
-      <h3 style="margin-top: 0;">School &amp; academic year</h3>
+      <div class="card-header">
+        <div class="icon" id="i1"></div>
+        <h3>School &amp; academic year</h3>
+      </div>
       <label>School name</label>
       <input id="school-name">
       <label style="margin-top: 12px;">Academic year (YYYY/YYYY)</label>
       <input id="academic-year" pattern="\d{4}/\d{4}">
-      <button class="primary" id="save-school" style="margin-top: 12px;">Save</button>
+      <button class="primary" id="save-school" style="margin-top: 16px;">${'' /* icon in JS */} Save changes</button>
     </div>
 
     <div class="card" style="margin-bottom: 16px;">
-      <h3 style="margin-top: 0;">Admin PIN</h3>
+      <div class="card-header">
+        <div class="icon" id="i2"></div>
+        <h3>Admin PIN</h3>
+      </div>
       <p>Change the PIN used to manage students and settings.</p>
-      <button id="btn-change-pin">Change PIN</button>
+      <button id="btn-change-pin">${''} Change PIN</button>
     </div>
 
     <div class="card" style="margin-bottom: 16px;">
-      <h3 style="margin-top: 0;">Backup &amp; restore</h3>
+      <div class="card-header">
+        <div class="icon" id="i3"></div>
+        <h3>Backup &amp; restore</h3>
+      </div>
       <p class="muted" id="backup-summary">Loading…</p>
       <div class="row" style="margin-top: 12px;">
-        <button id="btn-backup-now" class="primary">Back up now</button>
-        <button id="btn-restore">Restore from file…</button>
+        <button id="btn-backup-now" class="primary">${''} Back up now</button>
+        <button id="btn-restore">${''} Restore from file…</button>
       </div>
-      <h4 style="margin-bottom: 4px; margin-top: 16px;">Existing backups</h4>
-      <table><thead><tr><th>Filename</th><th>Size</th><th>When</th><th></th></tr></thead><tbody id="backups-tbody"></tbody></table>
+      <h4 style="margin: 20px 0 8px; font-size: 14px; text-transform: uppercase; color: var(--c-text-muted); letter-spacing: 0.05em;">Existing backups</h4>
+      <div class="table-wrap" style="border: none; box-shadow: none;">
+        <table>
+          <thead><tr><th>Filename</th><th>Size</th><th>When</th><th></th></tr></thead>
+          <tbody id="backups-tbody"></tbody>
+        </table>
+      </div>
     </div>
 
-    <div class="card" style="margin-bottom: 16px;">
-      <h3 style="margin-top: 0;">Server</h3>
+    <div class="card">
+      <div class="card-header">
+        <div class="icon" id="i4"></div>
+        <h3>Server</h3>
+      </div>
       <p class="muted">Restart the server (only needed after restore or app updates).</p>
-      <button id="btn-restart" class="danger">Restart server</button>
+      <button id="btn-restart" class="danger">${''} Restart server</button>
     </div>
   </main>
 
@@ -54,9 +76,20 @@
       if (!ok) { window.location.href = '/login.html?next=settings.html'; return; }
 
       try {
+        document.getElementById('i1').innerHTML = icon('school', 18);
+        document.getElementById('i2').innerHTML = icon('pin', 18);
+        document.getElementById('i3').innerHTML = icon('archive', 18);
+        document.getElementById('i4').innerHTML = icon('restart', 18);
+        document.querySelector('#save-school').insertAdjacentHTML('afterbegin', icon('save', 16));
+        document.querySelector('#btn-change-pin').insertAdjacentHTML('afterbegin', icon('refresh', 16));
+        document.querySelector('#btn-backup-now').insertAdjacentHTML('afterbegin', icon('archive', 16));
+        document.querySelector('#btn-restore').insertAdjacentHTML('afterbegin', icon('upload', 16));
+        document.querySelector('#btn-restart').insertAdjacentHTML('afterbegin', icon('restart', 16));
+
         const config = await API.get('/api/config/all');
         const topbar = Layout.renderTopbar({ active: 'settings', schoolName: config.school_name, backup: null });
-        document.getElementById('topbar-mount').replaceWith(topbar);
+        const mount = document.getElementById('topbar-mount');
+        mount.replaceWith(topbar);
         topbar.id = 'topbar-mount';
       } catch {}
       document.getElementById('footer-mount').replaceWith(Layout.renderFooter());
@@ -81,35 +114,38 @@
       const academic_year = document.getElementById('academic-year').value.trim();
       try {
         await Auth.authedRequest('PUT', '/api/config', { school_name, academic_year });
-        toast({ message: 'Saved', type: 'success' });
-        window.location.reload();
+        toast({ message: 'Settings saved', type: 'success' });
+        setTimeout(() => window.location.reload(), 600);
       } catch (e) { toast({ message: e.message, type: 'error' }); }
     }
 
     async function changePin() {
       const body = document.createElement('div');
       body.innerHTML = `
-        <label>Current PIN</label>
-        <input id="cur" type="password" inputmode="numeric" maxlength="8" autofocus>
+        <p>To change your PIN, you'll need your <strong>recovery code</strong> (the 16-character code you saved during setup).</p>
+        <label>Recovery code</label>
+        <input id="rc" placeholder="XXXX-XXXX-XXXX-XXXX" style="text-transform: uppercase; font-family: monospace;">
         <label style="margin-top: 12px;">New PIN</label>
         <input id="np" type="password" inputmode="numeric" maxlength="8">
         <label style="margin-top: 12px;">Confirm new PIN</label>
         <input id="np2" type="password" inputmode="numeric" maxlength="8">
-        <p class="muted" style="margin-top: 12px; font-size: 13px;">After changing, you'll be logged out and need to re-enter the new PIN.</p>
       `;
       showModal({
         title: 'Change admin PIN',
         body,
         actions: [
           { label: 'Cancel' },
-          { label: 'Save new PIN', class: 'primary', onClick: async () => {
-            const cur = document.getElementById('cur').value;
+          { label: 'Change PIN', class: 'primary', onClick: async () => {
+            const rc = document.getElementById('rc').value.trim().toUpperCase();
             const np = document.getElementById('np').value;
             const np2 = document.getElementById('np2').value;
             if (np !== np2) throw new Error('PINs do not match');
-            // No direct endpoint for PIN change without recovery — use wizard reset-pin requires recovery code.
-            // For now: ask user to use recovery code path.
-            throw new Error('To change PIN: log out, click "Forgot PIN" on login, enter recovery code from settings card (saved when PIN was set).');
+            const res = await API.post('/api/wizard/reset-pin', { recovery_code: rc, pin: np, pin_confirm: np2 });
+            showModal({
+              title: 'PIN changed',
+              body: `<p>Your PIN has been changed. <strong>Save your new recovery code:</strong></p><div class="recovery-code" style="margin-top: 12px;">${res.recovery_code}</div><p class="muted" style="margin-top: 12px;">The old recovery code no longer works.</p>`,
+              actions: [{ label: 'Done', class: 'primary', onClick: () => { Auth.setPin(np); window.location.reload(); } }],
+            });
           }},
         ],
       });
@@ -122,15 +158,21 @@
         summary.textContent = `${res.backups.length} backup${res.backups.length === 1 ? '' : 's'} in ${res.folder}`;
         const tbody = document.getElementById('backups-tbody');
         if (!res.backups.length) {
-          tbody.innerHTML = '<tr><td colspan="4" class="muted center">No backups yet.</td></tr>';
+          tbody.innerHTML = `<tr><td colspan="4" style="padding: 0; border: none;">
+            <div class="empty-state" style="padding: 40px 24px;">
+              <div class="empty-icon">${icon('archive', 32)}</div>
+              <h3>No backups yet</h3>
+              <p>Click <strong>Back up now</strong> above, or wait — automatic backups run every night at 2 AM.</p>
+            </div>
+          </td></tr>`;
           return;
         }
         tbody.innerHTML = res.backups.map(b => `
           <tr>
-            <td><code>${escapeHtml(b.filename)}</code></td>
+            <td><code style="font-size: 12px;">${escapeHtml(b.filename)}</code></td>
             <td>${(b.sizeBytes / 1024).toFixed(1)} KB</td>
             <td>${new Date(b.createdAt).toLocaleString()}</td>
-            <td><button class="ghost btn-del-backup" data-filename="${escapeHtml(b.filename)}" style="color: var(--c-danger);">Delete</button></td>
+            <td><button class="ghost icon-only btn-del-backup" data-filename="${escapeHtml(b.filename)}" title="Delete" style="color: var(--c-danger);">${icon('trash', 16)}</button></td>
           </tr>
         `).join('');
         tbody.querySelectorAll('.btn-del-backup').forEach(btn => {
@@ -167,7 +209,12 @@
       const body = document.createElement('div');
       body.innerHTML = `
         <p>Choose a backup zip file. Your current database will be saved as a safety backup before being replaced.</p>
-        <p class="error" style="font-size: 13px;"><strong>You must restart the server after restore.</strong></p>
+        <div class="card" style="background: var(--c-warning-soft); border: none; padding: 12px; margin-top: 12px;">
+          <div class="row" style="gap: 10px;">
+            ${icon('warning', 20)}
+            <div style="font-size: 14px;"><strong>You must restart the server after restore.</strong></div>
+          </div>
+        </div>
         <input id="file" type="file" accept=".zip" style="margin-top: 12px;">
       `;
       showModal({
@@ -183,8 +230,16 @@
             const res = await fetch('/api/restore', { method: 'POST', body: fd, headers: Auth.authHeaders() });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Restore failed');
-            toast({ message: 'Restore complete — restart the server now', type: 'success', duration: 8000 });
-            document.getElementById('btn-restart').classList.add('primary');
+            showModal({
+              title: 'Restore complete',
+              body: `<p>Your data has been restored from the backup.</p><p style="margin-top: 12px;"><strong>Please restart the server now</strong> for the restored data to take effect.</p>`,
+              actions: [
+                { label: 'Cancel' },
+                { label: 'Restart server now', class: 'primary', onClick: async () => {
+                  try { await Auth.authedRequest('POST', '/api/restart'); } catch {}
+                }},
+              ],
+            });
           }},
         ],
       });
