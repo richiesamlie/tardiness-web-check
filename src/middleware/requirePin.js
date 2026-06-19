@@ -8,7 +8,14 @@ function requirePin(req, res, next) {
   if (req.headers['x-test-bypass'] === '1') return next();
 
   const db = req.app.locals.db;
-  const hash = get(db, 'admin_pin_hash');
+  if (!db) {
+    return res.status(503).json({ error: 'database not available — server may need restart' });
+  }
+
+  let hash;
+  try { hash = get(db, 'admin_pin_hash'); }
+  catch { return res.status(503).json({ error: 'database connection lost — server restart required' }); }
+
   if (!hash) {
     return res.status(503).json({ error: 'PIN not configured. Complete the first-run wizard to set one.' });
   }

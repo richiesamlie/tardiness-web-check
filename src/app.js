@@ -33,7 +33,7 @@ function createApp({ db = null, dbPath = null } = {}) {
       try {
         const pragma = db.prepare('PRAGMA database_list').get();
         if (pragma && pragma.file) sizeBytes = fs.statSync(pragma.file).size;
-      } catch { /* :memory: */ }
+      } catch { /* :memory: or db closed */ }
       body.db = { sizeBytes };
 
       try {
@@ -50,6 +50,16 @@ function createApp({ db = null, dbPath = null } = {}) {
       } catch { /* no backup status */ }
     }
     res.json(body);
+  });
+
+  // Global JSON error handler (so unhandled errors return JSON, not HTML)
+  app.use((err, req, res, next) => {
+    console.error('[unhandled]', err);
+    if (res.headersSent) return next(err);
+    res.status(500).json({
+      error: err.message || 'internal server error',
+      ...(process.env.NODE_ENV !== 'production' ? { stack: err.stack } : {}),
+    });
   });
 
   return app;
