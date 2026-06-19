@@ -11,7 +11,10 @@
     "test:watch": "node --no-warnings --test --watch",
     "build": "node scripts/build-release.js",
     "release:dry": "RELEASE_VERSION=9.9.9 node scripts/build-release.js",
-    "version:check": "node -e \"const p=require('./package.json');console.log(p.name+'@'+p.version);if(!/^\\d+\\.\\d+\\.\\d+/.test(p.version)){console.error('Version must be semver');process.exit(1)}\""
+    "version:check": "node -e \"const p=require('./package.json');console.log(p.name+'@'+p.version);if(!/^\\d+\\.\\d+\\.\\d+/.test(p.version)){console.error('Version must be semver');process.exit(1)}\"",
+    "release:patch": "npm version patch && git push origin main --follow-tags",
+    "release:minor": "npm version minor && git push origin main --follow-tags",
+    "release:major": "npm version major && git push origin main --follow-tags"
   },
   "engines": {
     "node": ">=22.5.0"
