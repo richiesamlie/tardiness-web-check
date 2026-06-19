@@ -83,7 +83,7 @@
         <label>School name</label>
         <input id="school" type="text" value="${escapeHtml(data.school_name)}" placeholder="e.g. Elyon Christian Primary School" autofocus>
         <div class="modal-actions" style="justify-content: flex-end;">
-          <button class="primary big" id="next">Next ${icon('chevronRight', 16)}</button>
+          <button class="primary big" id="next">Next ${icon('arrowRight', 16)}</button>
         </div>
       `;
       document.getElementById('school').focus();
@@ -112,15 +112,15 @@
         suggestions.push(`${startYear + i}/${startYear + i + 1}`);
       }
       c.innerHTML = `
-        ${stepHeader('calendar', 'What academic year is it?', 'Format: YYYY/YYYY (e.g. ${suggestions[1]})')}
+        ${stepHeader('calendar', 'What academic year is it?', `Format: YYYY/YYYY (e.g. ${suggestions[1]})`)}
         <div class="wizard-options" id="year-options">
           ${suggestions.map(y => `<div class="wizard-option" data-year="${y}">${y}</div>`).join('')}
         </div>
         <label style="margin-top: 16px;">Or type a custom year</label>
         <input id="year" type="text" value="${escapeHtml(data.academic_year || suggestions[1])}" placeholder="YYYY/YYYY" pattern="\\d{4}/\\d{4}">
         <div class="modal-actions" style="justify-content: space-between;">
-          <button id="back">${icon('chevronRight', 16).replace('polyline points="9 18 15 12 9 6"', 'polyline points="15 18 9 12 15 6"')} Back</button>
-          <button class="primary big" id="next">Next ${icon('chevronRight', 16)}</button>
+          <button id="back">${icon('arrowLeft', 16)} Back</button>
+          <button class="primary big" id="next">Next ${icon('arrowRight', 16)}</button>
         </div>
       `;
       document.querySelectorAll('#year-options .wizard-option').forEach(el => {
@@ -152,8 +152,8 @@
         <label style="margin-top: 12px;">Confirm PIN</label>
         <input id="pin2" type="password" inputmode="numeric" pattern="\\d{4,8}" maxlength="8" class="huge center">
         <div class="modal-actions" style="justify-content: space-between;">
-          <button id="back">${icon('chevronRight', 16).replace('polyline points="9 18 15 12 9 6"', 'polyline points="15 18 9 12 15 6"')} Back</button>
-          <button class="primary big" id="next">Next ${icon('chevronRight', 16)}</button>
+          <button id="back">${icon('arrowLeft', 16)} Back</button>
+          <button class="primary big" id="next">Next ${icon('arrowRight', 16)}</button>
         </div>
       `;
       document.getElementById('pin').focus();

@@ -19,8 +19,10 @@ test('GET /api/health includes DB stats when db is provided', async () => {
     assert.strictEqual(res.status, 200);
     assert.strictEqual(res.body.ok, true);
     assert.ok(res.body.db, 'db field present');
-    assert.strictEqual(typeof res.body.db.sizeBytes, 'number');
+    assert.strictEqual(typeof res.body.db.size_bytes, 'number');
     assert.strictEqual(typeof res.body.uptimeSeconds, 'number');
+    assert.strictEqual(typeof res.body.app_version, 'string');
+    assert.strictEqual(typeof res.body.node_env, 'string');
   } finally {
     db.close();
   }

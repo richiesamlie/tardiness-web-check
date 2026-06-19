@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { requirePin } = require('../middleware/requirePin');
+const { log: logAudit } = require('../lib/audit');
 
 // ===== Helpers =====
 
@@ -89,6 +90,7 @@ router.post('/', requirePin, (req, res) => {
       'INSERT INTO students (student_id, full_name, class) VALUES (?, ?, ?)'
     ).run(sid, name, cls);
     const row = db.prepare('SELECT * FROM students WHERE id = ?').get(info.lastInsertRowid);
+    try { logAudit(db, { action: 'student.created', details: { student_id: sid, full_name: name, class: cls }, ip: req.ip }); } catch {}
     res.status(201).json(row);
   } catch (err) {
     if (err.errcode === 2067 || (err.message || '').includes('UNIQUE constraint')) {
@@ -124,6 +126,7 @@ router.put('/:id', requirePin, (req, res) => {
             WHERE student_id = s.id AND academic_year = ?) AS late_count
     FROM students s WHERE s.id = ?
   `).get(year, id);
+  try { logAudit(db, { action: 'student.updated', details: { id, full_name: newName, class: newClass }, ip: req.ip }); } catch {}
   res.json(updated);
 });
 
@@ -134,6 +137,7 @@ router.delete('/:id', requirePin, (req, res) => {
   if (!id) return res.status(400).json({ error: 'invalid id' });
   const info = db.prepare('UPDATE students SET active = 0 WHERE id = ?').run(id);
   if (info.changes === 0) return res.status(404).json({ error: 'student not found' });
+  try { logAudit(db, { action: 'student.deleted', details: { id }, ip: req.ip }); } catch {}
   res.json({ ok: true });
 });
 

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { toSqliteTimestamp, getTodayUtc } = require('../lib/time');
+const { log: logAudit } = require('../lib/audit');
 
 function eventWithStudent(db, whereSql, params, orderBy = 'e.occurred_at DESC, e.id DESC', limit = null, offset = 0) {
   let sql = `
@@ -44,6 +45,17 @@ router.post('/', (req, res) => {
   `).run(sid, ts, year, recorded_by || null, notes || null);
 
   const row = eventWithStudent(db, 'WHERE e.id = ?', [info.lastInsertRowid], null).pop();
+
+  // Audit log: track who/when/where a student was marked late (also captures IP)
+  try {
+    logAudit(db, {
+      actor: recorded_by || 'unknown',
+      action: 'tardiness.recorded',
+      details: { student_id: sid, notes: notes || null },
+      ip: req.ip,
+    });
+  } catch { /* audit is best-effort */ }
+
   res.status(201).json(row);
 });
 

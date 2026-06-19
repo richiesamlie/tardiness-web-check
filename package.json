@@ -16,7 +16,10 @@
   "dependencies": {
     "archiver": "^7.0.1",
     "bcryptjs": "^2.4.3",
+    "compression": "^1.8.1",
     "express": "^4.21.0",
+    "express-rate-limit": "^8.5.2",
+    "helmet": "^8.2.0",
     "multer": "^2.0.0",
     "node-cron": "^3.0.3",
     "unzipper": "^0.12.3",
