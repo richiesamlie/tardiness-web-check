@@ -37,14 +37,19 @@ jobs:
 
       - name: Determine version
         id: version
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            VERSION="${GITHUB_REF_NAME}"
+          if [[ "${REF_TYPE}" == "tag" ]]; then
+            VERSION="${REF_NAME}"
           else
-            VERSION="${GITHUB_EVENT_INPUTS_VERSION}"
+            # workflow_dispatch: read from $INPUT_VERSION (uppercased, dashes → underscores)
+            VERSION="${INPUT_VERSION}"
           fi
           VERSION="${VERSION#v}"  # strip leading 'v'
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "Using version: v${VERSION}"
 
       - name: Install dependencies
