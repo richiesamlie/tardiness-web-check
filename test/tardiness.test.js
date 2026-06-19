@@ -13,7 +13,9 @@ function makeApp() {
 
 async function createStudent(app, overrides = {}) {
   const payload = { student_id: 'P1-001', full_name: 'Alex Tan', class: 'Primary 1A', ...overrides };
-  const res = await request(app).post('/api/students').send(payload);
+  const res = await request(app).post('/api/students')
+    .set('X-Test-Bypass', '1')
+    .send(payload);
   return res.body;
 }
 
@@ -55,7 +57,7 @@ test('POST /api/tardiness returns 404 if student does not exist or is inactive',
     assert.strictEqual(res.status, 404);
 
     const s = await createStudent(app);
-    await request(app).delete(`/api/students/${s.id}`);
+    await request(app).delete(`/api/students/${s.id}`).set('X-Test-Bypass', '1');
     res = await request(app).post('/api/tardiness').send({ student_id: s.id });
     assert.strictEqual(res.status, 404);
   } finally { db.close(); }

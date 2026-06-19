@@ -12,7 +12,9 @@ function makeApp() {
 
 async function createStudent(app, overrides = {}) {
   const payload = { student_id: 'P1-001', full_name: 'Alex Tan', class: 'Primary 1A', ...overrides };
-  const res = await request(app).post('/api/students').send(payload);
+  const res = await request(app).post('/api/students')
+    .set('X-Test-Bypass', '1')
+    .send(payload);
   return res.body;
 }
 
@@ -79,7 +81,7 @@ test('GET /api/students excludes inactive by default; includeInactive=1 shows th
   try {
     const s1 = await createStudent(app, { student_id: 'P1-001', full_name: 'Active', class: 'Primary 1A' });
     const s2 = await createStudent(app, { student_id: 'P1-002', full_name: 'Inactive', class: 'Primary 1A' });
-    await request(app).delete(`/api/students/${s2.id}`);
+    await request(app).delete(`/api/students/${s2.id}`).set('X-Test-Bypass', '1');
 
     const def = await request(app).get('/api/students');
     assert.strictEqual(def.body.total, 1);
@@ -95,7 +97,9 @@ test('POST /api/students creates a student and returns 201 + body', async () => 
   const { app, db } = makeApp();
   try {
     const payload = { student_id: 'P1-001', full_name: 'Alex Tan', class: 'Primary 1A' };
-    const res = await request(app).post('/api/students').send(payload);
+    const res = await request(app).post('/api/students')
+      .set('X-Test-Bypass', '1')
+      .send(payload);
     assert.strictEqual(res.status, 201);
     assert.strictEqual(res.body.student_id, 'P1-001');
     assert.strictEqual(res.body.full_name, 'Alex Tan');
@@ -108,7 +112,9 @@ test('POST /api/students creates a student and returns 201 + body', async () => 
 test('POST /api/students returns 400 with plain-English errors when fields missing', async () => {
   const { app, db } = makeApp();
   try {
-    const res = await request(app).post('/api/students').send({ student_id: 'P1-001' });
+    const res = await request(app).post('/api/students')
+      .set('X-Test-Bypass', '1')
+      .send({ student_id: 'P1-001' });
     assert.strictEqual(res.status, 400);
     assert.ok(Array.isArray(res.body.errors));
     assert.ok(res.body.errors.some(e => e.includes('full_name')));
@@ -121,6 +127,7 @@ test('POST /api/students returns 409 on duplicate student_id', async () => {
   try {
     await createStudent(app, { student_id: 'P1-001', full_name: 'Alex', class: 'Primary 1A' });
     const res = await request(app).post('/api/students')
+      .set('X-Test-Bypass', '1')
       .send({ student_id: 'P1-001', full_name: 'Other', class: 'Primary 1B' });
     assert.strictEqual(res.status, 409);
     assert.ok(res.body.errors[0].includes('P1-001'));
@@ -161,6 +168,7 @@ test('PUT /api/students/:id updates name and class', async () => {
   try {
     const s = await createStudent(app);
     const res = await request(app).put(`/api/students/${s.id}`)
+      .set('X-Test-Bypass', '1')
       .send({ full_name: 'Alexandra Tan', class: 'Primary 1B' });
     assert.strictEqual(res.status, 200);
     assert.strictEqual(res.body.full_name, 'Alexandra Tan');
@@ -172,7 +180,9 @@ test('PUT /api/students/:id updates name and class', async () => {
 test('PUT /api/students/:id returns 404 for unknown id', async () => {
   const { app, db } = makeApp();
   try {
-    const res = await request(app).put('/api/students/9999').send({ full_name: 'X' });
+    const res = await request(app).put('/api/students/9999')
+      .set('X-Test-Bypass', '1')
+      .send({ full_name: 'X' });
     assert.strictEqual(res.status, 404);
   } finally { db.close(); }
 });
@@ -183,7 +193,7 @@ test('DELETE /api/students/:id soft-deletes (sets active=0, row preserved)', asy
   const { app, db } = makeApp();
   try {
     const s = await createStudent(app);
-    const res = await request(app).delete(`/api/students/${s.id}`);
+    const res = await request(app).delete(`/api/students/${s.id}`).set('X-Test-Bypass', '1');
     assert.strictEqual(res.status, 200);
     assert.strictEqual(res.body.ok, true);
     const row = db.prepare('SELECT * FROM students WHERE id = ?').get(s.id);
@@ -194,7 +204,7 @@ test('DELETE /api/students/:id soft-deletes (sets active=0, row preserved)', asy
 test('DELETE /api/students/:id returns 404 for unknown id', async () => {
   const { app, db } = makeApp();
   try {
-    const res = await request(app).delete('/api/students/9999');
+    const res = await request(app).delete('/api/students/9999').set('X-Test-Bypass', '1');
     assert.strictEqual(res.status, 404);
   } finally { db.close(); }
 });

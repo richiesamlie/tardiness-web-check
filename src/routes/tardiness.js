@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const { getCurrentAcademicYear } = require('../lib/year');
 const { toSqliteTimestamp, getTodayUtc } = require('../lib/time');
 
 function eventWithStudent(db, whereSql, params, orderBy = 'e.occurred_at DESC, e.id DESC', limit = null, offset = 0) {
@@ -20,9 +19,10 @@ function eventWithStudent(db, whereSql, params, orderBy = 'e.occurred_at DESC, e
   return db.prepare(sql).all(...allParams);
 }
 
-// POST /api/tardiness — mark a student late
+// POST /api/tardiness — mark a student late (NO PIN — fast path)
 router.post('/', (req, res) => {
   const db = req.app.locals.db;
+  const year = req.app.locals.getCurrentAcademicYear();
   const { student_id, notes, recorded_by, occurred_at } = req.body || {};
   const sid = parseInt(student_id, 10);
   if (!Number.isInteger(sid) || sid <= 0) {
@@ -38,7 +38,6 @@ router.post('/', (req, res) => {
   const student = db.prepare('SELECT id FROM students WHERE id = ? AND active = 1').get(sid);
   if (!student) return res.status(404).json({ errors: [`student id ${sid} not found or inactive`] });
 
-  const year = getCurrentAcademicYear();
   const info = db.prepare(`
     INSERT INTO tardiness_events (student_id, occurred_at, academic_year, recorded_by, notes)
     VALUES (?, COALESCE(?, datetime('now')), ?, ?, ?)
@@ -48,7 +47,7 @@ router.post('/', (req, res) => {
   res.status(201).json(row);
 });
 
-// GET /api/tardiness — list with filters
+// GET /api/tardiness — list with filters (public)
 router.get('/', (req, res) => {
   const db = req.app.locals.db;
   const date = (req.query.date || '').trim();
@@ -75,7 +74,7 @@ router.get('/', (req, res) => {
   res.json({ items, total, page, limit });
 });
 
-// GET /api/tardiness/today — events from today (UTC)
+// GET /api/tardiness/today — events from today (UTC) (public)
 router.get('/today', (req, res) => {
   const db = req.app.locals.db;
   const today = getTodayUtc();

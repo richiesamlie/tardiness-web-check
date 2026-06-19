@@ -1,12 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { getCurrentAcademicYear } = require('../lib/year');
 const { getTodayUtc } = require('../lib/time');
 
-// GET /api/stats — totals + per-class breakdown + today count
+// GET /api/stats — totals + per-class breakdown + today count (public)
 router.get('/', (req, res) => {
   const db = req.app.locals.db;
-  const year = getCurrentAcademicYear();
+  const year = req.app.locals.getCurrentAcademicYear();
   const today = getTodayUtc();
 
   const totalActive = db.prepare('SELECT COUNT(*) AS n FROM students WHERE active = 1').get().n;

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getCurrentAcademicYear } = require('../lib/year');
+const { requirePin } = require('../middleware/requirePin');
 
 // ===== Helpers =====
 
@@ -20,29 +20,18 @@ function validateStudentBody(body) {
   return { errors, sid, name, cls };
 }
 
-function studentWithLateCount(db, whereSql, whereParams) {
-  const year = getCurrentAcademicYear();
-  return db.prepare(`
-    SELECT s.*,
-           (SELECT COUNT(*) FROM tardiness_events
-            WHERE student_id = s.id AND academic_year = ?) AS late_count
-    FROM students s
-    ${whereSql}
-  `).all(year, ...whereParams);
-}
-
 // ===== Routes =====
 
-// List students (search, class filter, pagination, soft-delete aware)
+// List students (search, class filter, pagination, soft-delete aware) — public
 router.get('/', (req, res) => {
   const db = req.app.locals.db;
+  const year = req.app.locals.getCurrentAcademicYear();
   const search = (req.query.search || '').trim();
   const classFilter = (req.query.class || '').trim();
   const includeInactive = req.query.includeInactive === '1' || req.query.includeInactive === 'true';
   const limit = Math.min(parseInt(req.query.limit, 10) || 50, 500);
   const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
   const offset = (page - 1) * limit;
-  const year = getCurrentAcademicYear();
 
   const where = [];
   const params = [];
@@ -57,7 +46,8 @@ router.get('/', (req, res) => {
   }
   const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
 
-  const total = db.prepare(`SELECT COUNT(*) AS n FROM students s ${whereSql}`).get(...params).n;
+  const total = db.prepare(`SELECT COUNT(*) AS n FROM students s ${whereSql}`)
+    .get(...params).n;
 
   const items = db.prepare(`
     SELECT s.*,
@@ -72,12 +62,12 @@ router.get('/', (req, res) => {
   res.json({ items, total, page, limit });
 });
 
-// Get single student
+// Get single student — public
 router.get('/:id', (req, res) => {
   const db = req.app.locals.db;
   const id = parseInt32(req.params.id);
   if (!id) return res.status(400).json({ error: 'invalid id' });
-  const year = getCurrentAcademicYear();
+  const year = req.app.locals.getCurrentAcademicYear();
   const row = db.prepare(`
     SELECT s.*,
            (SELECT COUNT(*) FROM tardiness_events
@@ -88,8 +78,8 @@ router.get('/:id', (req, res) => {
   res.json(row);
 });
 
-// Create student
-router.post('/', (req, res) => {
+// Create student — PIN-gated
+router.post('/', requirePin, (req, res) => {
   const db = req.app.locals.db;
   const { errors, sid, name, cls } = validateStudentBody(req.body);
   if (errors.length) return res.status(400).json({ errors });
@@ -101,7 +91,6 @@ router.post('/', (req, res) => {
     const row = db.prepare('SELECT * FROM students WHERE id = ?').get(info.lastInsertRowid);
     res.status(201).json(row);
   } catch (err) {
-    // node:sqlite sets errcode = 2067 (SQLITE_CONSTRAINT_UNIQUE) on duplicate
     if (err.errcode === 2067 || (err.message || '').includes('UNIQUE constraint')) {
       return res.status(409).json({ errors: [`student_id "${sid}" already exists`] });
     }
@@ -109,8 +98,8 @@ router.post('/', (req, res) => {
   }
 });
 
-// Update student
-router.put('/:id', (req, res) => {
+// Update student — PIN-gated
+router.put('/:id', requirePin, (req, res) => {
   const db = req.app.locals.db;
   const id = parseInt32(req.params.id);
   if (!id) return res.status(400).json({ error: 'invalid id' });
@@ -128,7 +117,7 @@ router.put('/:id', (req, res) => {
 
   db.prepare('UPDATE students SET full_name = ?, class = ? WHERE id = ?')
     .run(newName, newClass, id);
-  const year = getCurrentAcademicYear();
+  const year = req.app.locals.getCurrentAcademicYear();
   const updated = db.prepare(`
     SELECT s.*,
            (SELECT COUNT(*) FROM tardiness_events
@@ -138,8 +127,8 @@ router.put('/:id', (req, res) => {
   res.json(updated);
 });
 
-// Soft-delete student
-router.delete('/:id', (req, res) => {
+// Soft-delete student — PIN-gated
+router.delete('/:id', requirePin, (req, res) => {
   const db = req.app.locals.db;
   const id = parseInt32(req.params.id);
   if (!id) return res.status(400).json({ error: 'invalid id' });
