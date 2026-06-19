@@ -23,6 +23,8 @@ jobs:
   build:
     name: Build & verify
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Checkout (with full history for changelog)
         uses: actions/checkout@v4
