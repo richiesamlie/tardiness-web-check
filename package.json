@@ -7,8 +7,8 @@
   "scripts": {
     "start": "node --no-warnings src/server.js",
     "dev": "node --watch src/server.js",
-    "test": "node --no-warnings --test test/",
-    "test:watch": "node --test --watch test/"
+    "test": "node --no-warnings --test",
+    "test:watch": "node --no-warnings --test --watch"
   },
   "engines": {
     "node": ">=22.5.0"
@@ -17,7 +17,7 @@
     "archiver": "^7.0.1",
     "bcryptjs": "^2.4.3",
     "express": "^4.21.0",
-    "multer": "^2.2.0",
+    "multer": "^2.0.0",
     "node-cron": "^3.0.3",
     "xlsx": "^0.18.5"
   },
