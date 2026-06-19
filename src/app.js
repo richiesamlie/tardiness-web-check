@@ -5,6 +5,7 @@ const tardinessRouter = require('./routes/tardiness');
 const statsRouter = require('./routes/stats');
 const configRouter = require('./routes/config');
 const wizardRouter = require('./routes/wizard');
+const dataRouter = require('./routes/data');
 const { createYearHelper } = require('./lib/year');
 
 function createApp({ db = null } = {}) {
@@ -19,6 +20,7 @@ function createApp({ db = null } = {}) {
   app.use('/api/stats', statsRouter);
   app.use('/api/config', configRouter);
   app.use('/api/wizard', wizardRouter);
+  app.use('/api', dataRouter);
 
   app.get('/api/health', (req, res) => {
     const body = { ok: true, uptimeSeconds: Math.round((Date.now() - startedAt) / 1000) };
