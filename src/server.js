@@ -2,6 +2,7 @@ const path = require('node:path');
 const os = require('node:os');
 const { createApp } = require('./app');
 const { createDb } = require('./db');
+const { startBackupScheduler } = require('./lib/scheduler');
 
 const PORT = parseInt(process.env.PORT, 10) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -18,7 +19,7 @@ function getLanIp() {
 }
 
 const db = createDb({ path: DB_PATH });
-const app = createApp({ db });
+const app = createApp({ db, dbPath: DB_PATH });
 
 const server = app.listen(PORT, HOST, () => {
   console.log('');
@@ -27,6 +28,7 @@ const server = app.listen(PORT, HOST, () => {
   console.log(`  Network: http://${getLanIp()}:${PORT}`);
   console.log(`  Database: ${DB_PATH}`);
   console.log('');
+  startBackupScheduler(db, DB_PATH);
 });
 
 function shutdown(signal) {
