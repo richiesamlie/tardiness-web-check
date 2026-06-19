@@ -1,227 +1,368 @@
-# Tardiness Check
+# 📋 Tardiness Check
 
-A self-hosted, single-folder web app for tracking student tardiness. Built for schools that want something simple, private, and easy to operate without IT staff.
+> A self-hosted tardiness tracking web app for schools. One folder, one server, no IT staff needed.
 
-- ✅ **One server, one folder** — no cloud, no Docker, no complex setup
-- ✅ **Search-and-tap** workflow for gate staff (under 5 seconds per mark)
-- ✅ **CSV + Excel** import/export
-- ✅ **Auto-backup daily** + one-click restore
-- ✅ **Plain English** UI, designed for non-IT admins
-- ✅ **Built-in diagnostics** ("Get Help" copies everything support needs)
+![License: MIT](https://img.shields.io/badge/license-MIT-green)
+![Node: 22+](https://img.shields.io/badge/node-%E2%89%A522-brightgreen)
+![Tests: 112](https://img.shields.io/badge/tests-112%20passing-success)
+![Status: Production](https://img.shields.io/badge/status-production-blue)
 
-> Built for Elyon Christian Primary School (Jakarta). General-purpose for any primary/secondary school.
+Built for schools that need a **simple, private, easy-to-operate** way to track student lateness — without cloud subscriptions, mobile apps, or IT support.
+
+The app runs on a single computer at your school, displays on any tablet/phone/laptop on the same Wi-Fi, and stores all data in a single SQLite file you can back up with a copy-paste.
 
 ---
 
-## 🚀 Quick Start (Windows)
+## ✨ Features
 
-1. **Install Node.js** (one-time, takes 2 min):
-   - Go to <https://nodejs.org/>
-   - Download the **LTS** version (Node 22 or later)
-   - Run the installer with all default options
+### For gate staff (no PIN required)
+- 🔍 **Search-and-tap marking** — type a few letters, tap the name, done. Under 5 seconds per student.
+- 🕐 **Server-side timestamps** — never lose track of "when" even if the tablet's clock is wrong.
+- 📋 **"Recently marked today"** sidebar — see who just got marked (prevents double-marking).
+- 🎯 **Reason tags** — optional: Traffic, Medical, Family, Other.
 
-2. **Start the app**:
-   - Double-click **`Start.bat`**
-   - Browser opens automatically at `http://localhost:3000`
+### For admins (PIN-protected)
+- 👥 **Roster management** — add, edit, delete, search, filter by class.
+- 📊 **Reports** — today, this week, per-class breakdown, top offenders.
+- 📥 **Import / Export** — Excel (`.xlsx`) and CSV. Two-step preview before commit.
+- 💾 **Automatic daily backups** at 2 AM + manual backup + restore.
+- 🔐 **PIN auth** with **recovery code** (16-character, unambiguous alphabet).
+- 📝 **Audit log** of every admin action (who, when, what).
+- 🛟 **"Get Help" button** — copies a complete diagnostics report to your clipboard.
+- 🧙 **First-run wizard** — 4 screens, ~2 minutes, no manual needed.
 
-3. **First-run setup** (4 screens, ~2 minutes):
-   - Enter your school name
-   - Pick the academic year (e.g. `2025/2026`)
-   - Create a 4–8 digit admin PIN
-   - **Save the recovery code** somewhere safe (write it down or print it)
+### For the IT-curious
+- 🪶 **Light footprint** — ~3,700 lines of code, 10 npm dependencies, all pure-JS (no native compilation).
+- 🔒 **Security headers** — Helmet, CSP, X-Frame-Options, request IDs.
+- 📦 **Zero install on client devices** — tablets just open a URL in a browser.
+- 🌐 **Offline-first** — no internet required at runtime. Works on a school's LAN only.
+- 🧪 **112 backend tests** — runs in <5s with the Node.js native test runner.
 
-4. **Add students** — either:
-   - Click "+ Add student" for one at a time, or
-   - Click "Import" → download template → fill in Excel → upload
+---
 
-That's it. The server runs in the Start.bat window — close that window to stop.
+## 🚀 Quick Start
 
-## 🚀 Quick Start (macOS)
+You need **Node.js 22 or later** (LTS). Get it from [nodejs.org](https://nodejs.org/) — one-time install, ~2 minutes.
 
-1. Install Node.js from <https://nodejs.org/> (LTS, v22+)
-2. Double-click **`Start.command`**
-3. First browser may take 10 seconds to open; allow it in System Settings if prompted
+### Windows
 
-## 🚀 Quick Start (Linux)
-
-```bash
-node --version   # need v22+
-npm start        # or: ./Start.command after chmod +x
+```cmd
+1. Double-click  Start.bat
 ```
 
-Then open `http://localhost:3000`.
+That's it. The browser opens at `http://localhost:3000` automatically.
+
+### macOS
+
+```bash
+1. Double-click  Start.command
+```
+
+(First run: if macOS blocks it, right-click → Open → Open in the dialog.)
+
+### Linux / manual
+
+```bash
+npm install        # one-time, ~30 seconds
+npm start          # starts on http://localhost:3000
+```
+
+### First-run wizard (4 screens, ~2 minutes)
+
+1. **School name** — e.g. "Elyon Christian Primary School"
+2. **Academic year** — pick from suggestions (e.g. `2025/2026`)
+3. **Admin PIN** — 4 to 8 digits
+4. **Recovery code** — **write this down or print it!** Format: `XXXX-XXXX-XXXX-XXXX`. This is the only way to recover your PIN if forgotten.
+
+### Add students
+
+**Option A — one at a time** (good for small classes):
+- Click **Roster** → **Add student** → fill in ID, name, class → Save
+
+**Option B — Excel import** (good for large schools):
+- Click **Roster** → **Import** → **Download template** → fill in your roster in Excel → upload the file → preview → commit
 
 ---
 
 ## 📱 Using the App
 
-### For gate staff (no PIN needed)
-1. Open `http://<server-ip>:3000` on the tablet
-2. Type a student's name or ID
-3. Tap their name → confirm "Mark late at 09:42?"
-4. Done. The student is logged with timestamp.
+### Gate staff workflow
 
-### For admins (PIN required)
-Click **Roster**, **Reports**, or **Settings** in the top navigation. Enter your 6-digit PIN when prompted.
+```
+1. Open http://<server-ip>:3000 on the tablet
+2. Type the student's name (or just first few letters)
+3. Tap their name → "Confirm late mark" modal appears
+4. Tap "Mark late" → done in under 5 seconds
+```
 
-### On a tablet at the gate
-- Add to Home Screen (iOS Safari / Android Chrome) → opens full-screen
-- Or bookmark the URL
+> Tip: Add the page to your tablet's home screen for full-screen, no-browser-bar operation (iOS Safari: Share → Add to Home Screen; Android Chrome: menu → Add to Home Screen).
+
+### Admin workflow
+
+- Click **Roster** to manage students
+- Click **Reports** for statistics
+- Click **Settings** to change school name, year, PIN, backup settings
+- All admin pages require your PIN
+
+### Connecting from tablets
+
+When the server starts, it prints:
+
+```
+  Tardiness Check server running
+  Local:   http://localhost:3000
+  Network: http://192.168.1.42:3000    ← use this URL on tablets
+```
+
+The "Network" URL works on any device on the same Wi-Fi as the server.
 
 ---
 
 ## 🛠️ Auto-Start on Boot (Windows)
 
-Run **`Install-Service.bat`** once. The app will start automatically every time you log in to Windows. Run **`Uninstall-Service.bat`** to remove.
+For a "set and forget" installation:
 
----
+1. Run **`Install-Service.bat`** (one-time, requires admin)
+2. The app starts automatically every time you log in to Windows
+3. Run **`Uninstall-Service.bat`** to remove
 
-## 🌐 Accessing from Other Devices (Tablet, Phone)
-
-When the server starts, it shows your LAN IP:
-
-```
-  Tardiness Check server running
-  Local:   http://localhost:3000
-  Network: http://192.168.1.42:3000     ← use this on tablets/phones
-```
-
-Type the "Network" URL on the tablet's browser. They must be on the same Wi-Fi network.
-
-**Firewall tip (Windows):** if the tablet can't connect, allow Node.js through Windows Firewall when prompted, or manually add a rule for port 3000.
+The app also survives reboots and crashes — Node.js starts the server and stays running until you log out or kill it.
 
 ---
 
 ## 📁 Project Structure
 
 ```
-tardiness-app/
-├── Start.bat              ← double-click entry (Windows)
-├── Start.command          ← macOS entry
-├── Install-Service.bat    ← auto-start on Windows logon
-├── Uninstall-Service.bat  ← remove auto-start
+tardiness-web-check/
+├── Start.bat / Start.command    ← double-click launchers
+├── Install-Service.bat          ← auto-start on Windows logon
+├── Uninstall-Service.bat
 ├── package.json
-├── README.md
-├── LICENSE
-├── src/
-│   ├── server.js          ← entry point
-│   ├── app.js             ← Express app factory
-│   ├── db.js              ← SQLite setup + schema
-│   ├── routes/            ← API endpoints (students, tardiness, config, wizard, data, backup, diagnostics)
-│   └── lib/               ← helpers (config, pin, audit, backup, xlsx, time, year, scheduler)
-├── public/                ← frontend (HTML + CSS + vanilla JS)
-│   ├── index.html         ← Mark Late (gate staff)
-│   ├── wizard.html        ← First-run setup
-│   ├── login.html         ← PIN entry
-│   ├── roster.html        ← Student management
-│   ├── reports.html       ← Stats and reports
-│   ├── settings.html      ← Admin settings
-│   ├── css/style.css
-│   └── js/common.js
-├── test/                  ← 93 backend tests (Node native test runner)
-├── data/
-│   ├── tardiness.db       ← your data (gitignored)
-│   └── backups/           ← automatic daily backups (gitignored)
+├── README.md                    ← you are here
+├── LICENSE                      ← MIT
+│
+├── src/                         ← backend (Node.js + Express)
+│   ├── server.js                ← entry point + graceful shutdown
+│   ├── app.js                   ← Express app + middleware chain
+│   ├── db.js                    ← SQLite setup + 4-table schema
+│   ├── config.js                ← env-driven config
+│   ├── errors.js                ← typed error classes
+│   ├── routes/                  ← 27 API endpoints across 9 routers
+│   │   ├── students.js          ← CRUD + search + late_count
+│   │   ├── tardiness.js         ← record + query events
+│   │   ├── stats.js             ← per-class + overall totals
+│   │   ├── config.js            ← school name, academic year, PIN
+│   │   ├── wizard.js            ← 4-step first-run setup
+│   │   ├── data.js              ← import / export / template
+│   │   ├── backup.js            ← backup / restore
+│   │   └── diagnostics.js       ← audit log + health + Get Help
+│   ├── lib/                     ← helpers
+│   │   ├── pin.js               ← bcrypt PIN + recovery codes
+│   │   ├── audit.js             ← structured audit log
+│   │   ├── backup.js            ← zip → extract round-trip
+│   │   ├── xlsx.js              ← Excel read/write (SheetJS)
+│   │   ├── year.js              ← academic year rollover
+│   │   └── scheduler.js         ← cron-based auto-backup
+│   └── middleware/              ← request id, helmet, compression,
+│                                  rate limit, error handling
+│
+├── public/                      ← frontend (no build step)
+│   ├── index.html               ← Mark Late (gate staff)
+│   ├── wizard.html              ← First-run setup
+│   ├── login.html               ← PIN entry
+│   ├── roster.html              ← Student management
+│   ├── reports.html             ← Statistics
+│   ├── settings.html            ← Admin settings
+│   ├── css/style.css            ← modern design system (~840 lines)
+│   └── js/common.js             ← icon(), API, Auth, modal, toast, topbar
+│
+├── test/                        ← 112 backend tests (Node native test runner)
+│   ├── server.test.js
+│   ├── wizard.test.js
+│   ├── students.test.js
+│   ├── tardiness.test.js
+│   ├── middleware.test.js
+│   └── ...
+│
+├── data/                        ← your data (gitignored)
+│   ├── tardiness.db             ← single SQLite file
+│   └── backups/                 ← daily auto-backups (.zip)
+│
+├── scripts/
+│   └── capture-screenshots.js   ← puppeteer screenshot helper
+│
+├── screenshots/                 ← UI screenshots (auto-generated)
+│
 └── docs/
-    ├── tardiness-app-PLAN.md         ← master spec
-    ├── IMPLEMENTATION_PLAN.md        ← phased build plan
-    └── VIDEO_SCRIPT.md               ← walkthrough video script
+    ├── VIDEO_SCRIPT.md          ← walkthrough video script
+    └── *.md                     ← implementation plans and specs
 ```
 
 ---
 
 ## 🧪 Development
 
-```bash
-npm test           # run 93 backend tests
-npm start          # start the server
-npm run dev        # start with --watch (auto-restart on file change)
-```
-
-### Architecture
-
-- **Backend:** Node.js (≥22.5) + Express + `better-sqlite3` (no native compilation needed — uses built-in `node:sqlite`)
-- **Frontend:** Plain HTML + vanilla JS + small CSS file. No build step, no framework, no bundler.
-- **Storage:** Single SQLite file at `data/tardiness.db`. Backup-friendly.
-- **No external dependencies at runtime** — works fully offline on the LAN.
-
-### Tests
+### Running tests
 
 ```bash
 npm test
 ```
 
-93 tests covering all API endpoints, PIN auth, wizard flow, backup round-trip, import/export, audit log, and diagnostics.
+Runs 112 backend tests in <5 seconds. Tests cover:
+- Server lifecycle (startup, health, shutdown)
+- Wizard flow (school → year → PIN → recovery)
+- Students CRUD + search + class filter
+- Tardiness events + late count
+- PIN auth + recovery code
+- Backup round-trip
+- Import/export round-trip
+- Audit log
+- Middleware (request ID, helmet, compression, rate limit, error handling)
+
+### Architecture decisions
+
+| Decision | Why |
+|---|---|
+| **Node.js 22+** | LTS, runs on Windows / Mac / Linux / Raspberry Pi without changes |
+| **`node:sqlite`** (built-in) | No native compilation (no VS Build Tools required). Same API as better-sqlite3. |
+| **`bcryptjs`** | Pure JS bcrypt — no native deps |
+| **`xlsx`** (SheetJS) | Excel read/write without Microsoft Office |
+| **Vanilla HTML + JS frontend** | No build step, no bundler, no framework. Loads instantly. |
+| **SQLite** | Single file, no DB server, easy to back up (`xcopy`, `cp`, `rsync`) |
+| **Helmet + compression + rate-limit** | Production-grade security headers + 90% bandwidth savings |
+| **Express 4** | Battle-tested, minimal, perfect for this use case |
+| **No PWA, no SPA, no service worker** | Keeps it simple. Tablets just bookmark the URL. |
+
+### Environment variables
+
+All optional. The app works without any of these.
+
+| Var | Default | What |
+|---|---|---|
+| `PORT` | `3000` | HTTP port |
+| `NODE_ENV` | `development` | `production` hides error stacks in responses |
+| `DB_PATH` | `data/tardiness.db` | SQLite file location |
+| `RATE_LIMIT_GENERAL` | `600` | Reqs/15min per IP for non-PIN endpoints |
+| `RATE_LIMIT_PIN` | `30` | Reqs/15min per IP for PIN-gated endpoints |
+| `BODY_LIMIT` | `1mb` | Max request body size |
+| `AUTO_BACKUP_ENABLED` | `true` | Enable daily 2 AM backup |
+| `BACKUP_RETENTION_DAYS` | `30` | Delete backups older than this |
 
 ---
 
 ## 🆘 Troubleshooting
 
 ### "Node.js is not installed" when running Start.bat
-Install Node.js 22 LTS from <https://nodejs.org/>.
+
+Download and install Node.js 22 LTS from [nodejs.org](https://nodejs.org/). Use all default options. Restart your computer after installing.
 
 ### Browser doesn't open automatically
-Open `http://localhost:3000` manually. If nothing loads, check the Start.bat console for errors.
+
+Open `http://localhost:3000` manually in any browser (Chrome, Firefox, Edge, Safari). If nothing loads, check the `Start.bat` console window for error messages.
 
 ### Tablet can't reach the server
-- Make sure the tablet is on the same Wi-Fi network as the server
-- Check Windows Firewall isn't blocking Node.js (you'll get a popup the first time)
-- Try the LAN IP shown in the Start.bat console instead of `localhost`
 
-### Forgot PIN
-On the login screen, click **"Forgot PIN? Use recovery code"**. Enter your 16-character recovery code (XXXX-XXXX-XXXX-XXXX) and choose a new PIN.
+1. Make sure the tablet is on the **same Wi-Fi network** as the server computer
+2. Use the **Network URL** shown in the console (e.g. `http://192.168.1.42:3000`), not `localhost`
+3. If still failing: open **Windows Defender Firewall** → **Advanced settings** → **Inbound Rules** → **New Rule** → Port → TCP 3000 → Allow
 
-**No recovery code?** Contact your IT support — they'll need to reset the database from a backup.
+### Forgot the admin PIN
 
-### Something is broken
-On any page, click **"Get Help"** in the footer. This copies a complete diagnostics report to your clipboard. Paste it into a message to your IT contact — it includes version info, database size, and recent activity.
+On the login screen, click **"Forgot PIN? Use recovery code"**. Enter the 16-character code (format `XXXX-XXXX-XXXX-XXXX`) you saved during setup. You'll be prompted to set a new PIN.
 
----
+> **No recovery code?** You must restore from a backup, or have your IT support reset the database.
 
-## 📊 Features
+### "Get Help" — copy diagnostics to clipboard
 
-### Core (v1)
-- Mark student late (search + tap, ~5 seconds)
-- Student roster with search + class filter
-- Daily auto-backup (2 AM) + manual backup/restore
-- CSV + XLSX import/export with 2-step preview → apply
-- Reports: today, this week, per-class breakdown, top offenders
-- PIN-protected admin area
-- Recovery code (in case of forgotten PIN)
-- Audit log of every admin action
-- "Get Help" → copy diagnostics
-- First-run wizard (4 screens, no manual needed)
-- Plain English UI (no jargon)
+On any page, click **Get Help** in the footer. This copies a complete report (version, database size, recent errors, audit log tail) to your clipboard. Paste it into a message to your IT contact — they have everything they need to help.
 
-### Keyboard shortcuts
-- `/` — focus search (on Tardiness Check page)
-- `Esc` — close any open modal
-- `Enter` — confirm the highlighted result
+### Something else broken?
 
-### Roadmap (v2+)
-- Barcode/RFID scan-to-mark
-- WhatsApp parent notification on Nth late
-- Multi-school / multi-tenant
-- PWA install (offline mode)
-- Biometric / RFID check-in
+1. Check the **`Start.bat` console window** — error messages appear there
+2. Click **Get Help** → paste the diagnostics
+3. Check `data/backups/` for the most recent automatic backup (in case you need to restore)
+4. Open an issue on [GitHub](https://github.com/richiesamlie/tardiness-web-check/issues) with the diagnostics attached
 
 ---
 
 ## 🔒 Security & Privacy
 
-- All data stays on your school network — no cloud, no third-party access
-- Admin PIN is bcrypt-hashed; recovery code is hashed separately
-- "Mark Late" requires no PIN (intentional — gate staff just need to scan/tap quickly)
-- Roster/Reports/Settings require the admin PIN
-- Every admin action is logged in the audit log with timestamp + IP
-- Change PIN anytime from **Settings** (using your recovery code)
-- Backups include everything (DB + config + audit log); restore requires admin PIN
+This is a **self-hosted** app. **All data stays on your school's network**. No cloud, no third-party access, no telemetry.
+
+### What we do
+
+| Layer | Measure |
+|---|---|
+| **Transport** | LAN-only by default. Server binds to all interfaces, but is not exposed to the internet unless you explicitly set up port forwarding. |
+| **Auth** | PIN (4–8 digits), bcrypt-hashed, never stored in plaintext |
+| **Recovery** | 16-character recovery code, hashed separately. Unambiguous alphabet (no 0/1/I/O confusion). |
+| **Sessions** | PIN lives in `sessionStorage` only — cleared when browser tab closes |
+| **Headers** | Helmet: CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy |
+| **Rate limit** | 600/15min general, 30/15min PIN-gated |
+| **CSRF** | Same-origin only (CORS not enabled) |
+| **Audit** | Every admin action logged with timestamp + IP + actor |
+| **Backups** | `.zip` files include DB + config. Restore requires admin PIN. |
+| **Error handling** | Stack traces hidden in production, request ID returned for traceability |
+
+### What we don't do
+
+- ❌ No cloud sync
+- ❌ No analytics / telemetry
+- ❌ No third-party APIs (no Google, no Firebase, no Sentry)
+- ❌ No phone-home or "phone-home to check for updates"
+- ❌ No telemetry on errors (but your "Get Help" includes a copy-paste for you to send)
+
+---
+
+## 🧭 Roadmap
+
+### Shipped (v1.0)
+- ✅ Wizard, login, mark-late, roster CRUD, reports, settings
+- ✅ Excel + CSV import/export
+- ✅ Auto-backup + manual backup + restore
+- ✅ PIN auth + recovery code
+- ✅ Audit log
+- ✅ First-run wizard
+- ✅ "Get Help" diagnostics
+- ✅ 112 backend tests
+- ✅ Modern UI (Helmet, CSP, compression, rate limit)
+
+### Planned (v2)
+- 🔲 PWA (offline mode + add-to-home-screen)
+- 🔲 Barcode / RFID scan-to-mark
+- 🔲 WhatsApp parent notification on Nth late
+- 🔲 Multi-school / multi-tenant
+- 🔲 Year-end archive + new-year rollover wizard
+- 🔲 Per-class timetable (auto-resolve "expected at" time)
+
+### Considered (v3+)
+- 🔲 Student/parent self-service portal (no PIN needed)
+- 🔲 SMS notifications
+- 🔲 Biometric check-in
+
+---
+
+## 📊 Project Stats
+
+| Metric | Value |
+|---|---|
+| Lines of code | ~3,700 (backend + frontend) |
+| npm dependencies | 10 (all pure-JS, no native compilation) |
+| Backend tests | 112 (Node native test runner, <5s) |
+| Frontend pages | 6 (HTML) |
+| CSS lines | ~840 |
+| Frontend JS lines | ~600 |
+| API endpoints | 27 across 9 routers |
+| Database tables | 4 (students, tardiness_events, config, audit_log) |
+| External services | 0 |
+| Minimum Node.js | 22 (LTS) |
+| License | MIT |
 
 ---
 
 ## 📝 License
 
-MIT License — see `LICENSE` file. Free to use, modify, and distribute.
+MIT — see the [LICENSE](LICENSE) file. Free to use, modify, and distribute. No warranty.
 
 ---
 
@@ -229,6 +370,30 @@ MIT License — see `LICENSE` file. Free to use, modify, and distribute.
 
 Built with care for school admin staff who shouldn't need IT support to do their job.
 
-**Tech stack:** Node.js · Express · SQLite · SheetJS · bcryptjs · plain HTML/CSS/JS.
+**Tech stack:** Node.js · Express · SQLite (built-in `node:sqlite`) · SheetJS · bcryptjs · archiver · Helmet · plain HTML/CSS/JS.
 
-**Total project size:** ~3,200 lines of code, 93 backend tests, 6 frontend pages, 27 API endpoints.
+Originally built for **Elyon Christian Primary School (Jakarta)**. General-purpose for any primary or secondary school.
+
+---
+
+## 🤝 Contributing
+
+Issues and PRs welcome at [github.com/richiesamlie/tardiness-web-check](https://github.com/richiesamlie/tardiness-web-check).
+
+When reporting a bug, please include the output of the **Get Help** button (Settings → Get Help → Copy).
+
+When proposing a feature, please describe:
+- **Who** benefits (gate staff? admin? parent? student?)
+- **What** the feature does
+- **Why** it's worth the maintenance cost (this app optimizes for "no maintenance")
+
+---
+
+## 📞 Support
+
+1. Click **Get Help** in the app footer → paste the report
+2. Check the [Troubleshooting](#-troubleshooting) section above
+3. Search [GitHub Issues](https://github.com/richiesamlie/tardiness-web-check/issues)
+4. Open a new issue with the diagnostics attached
+
+**Made with ❤️ for schools that just want things to work.**
