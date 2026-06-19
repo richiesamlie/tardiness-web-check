@@ -1,6 +1,6 @@
 {
   "name": "tardiness-web-check",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "description": "Self-hosted tardiness tracking for schools",
   "main": "src/server.js",
