@@ -126,17 +126,10 @@ test('rateLimit.general: allows up to max requests', async () => {
 });
 
 test('rateLimit: returns 429 with JSON when limit exceeded', async () => {
-  // Create a tiny limit by re-instantiating with options via a sub-app
-  // (We import the inner fn to override the limit; do that via the module)
-  const rateLimitModule = require('express-rate-limit');
+  // Use the native rate limit module to test with a tiny limit
+  const rateLimit = require('../src/middleware/rateLimit');
   const app = express();
-  app.use(rateLimitModule({
-    windowMs: 60_000,
-    max: 2,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: 'too many', code: 'rate_limited' },
-  }));
+  app.use(rateLimit._createLimiter(2, 60_000));
   app.get('/x', (req, res) => res.json({ ok: true }));
 
   await request(app).get('/x');
