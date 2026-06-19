@@ -1,5 +1,6 @@
 const express = require('express');
 const fs = require('node:fs');
+const studentsRouter = require('./routes/students');
 
 function createApp({ db = null } = {}) {
   const app = express();
@@ -7,6 +8,7 @@ function createApp({ db = null } = {}) {
   app.locals.db = db;
 
   app.use(express.json());
+  app.use('/api/students', studentsRouter);
 
   app.get('/api/health', (req, res) => {
     const body = {
