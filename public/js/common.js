@@ -19,7 +19,16 @@
       let json;
       try { json = text ? JSON.parse(text) : null; } catch { json = { raw: text }; }
       if (!res.ok) {
-        const err = new Error((json && (json.error || json.message)) || `HTTP ${res.status}`);
+        // Build a useful error message: prefer specific field errors over generic
+        let msg;
+        if (json && Array.isArray(json.errors) && json.errors.length) {
+          msg = json.errors.join('; ');
+        } else if (json && (json.error || json.message)) {
+          msg = json.error || json.message;
+        } else {
+          msg = `HTTP ${res.status}`;
+        }
+        const err = new Error(msg);
         err.status = res.status;
         err.body = json;
         throw err;
@@ -100,8 +109,11 @@
     const pin = getPin();
     return pin ? { 'X-Admin-Pin': pin } : {};
   }
-  async function authedRequest(method, path, opts = {}) {
-    return API.request(method, path, { ...opts, headers: { ...authHeaders(), ...(opts.headers || {}) } });
+  // Signature: (method, path, body, opts)
+  // - body: the request payload (object for JSON, FormData for forms, undefined for GET)
+  // - opts: optional { headers, isForm, query }
+  async function authedRequest(method, path, body, opts = {}) {
+    return API.request(method, path, { ...opts, body, headers: { ...authHeaders(), ...(opts.headers || {}) } });
   }
   async function pingPin() {
     try {
@@ -134,8 +146,7 @@
     const msg = document.createElement('span');
     msg.className = 'toast-msg';
     msg.textContent = message;
-    toast.appendChild(msg);
-    if (actions.length) {
+    toast.appendChild(msg);    if (actions.length) {
       const act = document.createElement('div');
       act.className = 'toast-actions';
       actions.forEach(a => {
@@ -189,9 +200,15 @@
         btn.className = a.class || '';
         btn.addEventListener('click', async () => {
           try {
-            const r = await a.onClick && a.onClick();
+            // No onClick → just close (Cancel button behavior)
+            if (typeof a.onClick !== 'function') {
+              close();
+              return;
+            }
+            const r = await a.onClick();
             if (r !== false) close();
           } catch (e) {
+            // Action threw — keep modal open, show toast with the real error message
             toast({ message: e.message || 'error', type: 'error' });
           }
         });

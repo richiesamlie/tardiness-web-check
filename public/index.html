@@ -51,12 +51,13 @@
         const backup = await API.get('/api/health').then(h => h.backup).catch(() => null);
         const topbar = Layout.renderTopbar({ active: 'mark', schoolName: config.school_name, backup });
         const mount = document.getElementById('topbar-mount');
-        mount.replaceWith(topbar);
+        if (mount) mount.replaceWith(topbar); else document.body.prepend(topbar);
         topbar.id = 'topbar-mount';
       } catch (e) {
         console.error('init failed', e);
       }
-      document.getElementById('footer-mount').replaceWith(Layout.renderFooter());
+      const fm = document.getElementById('footer-mount');
+      if (fm) fm.replaceWith(Layout.renderFooter());
 
       await loadStudents();
       await loadToday();

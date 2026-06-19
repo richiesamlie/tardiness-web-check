@@ -26,7 +26,7 @@
       <input id="school-name">
       <label style="margin-top: 12px;">Academic year (YYYY/YYYY)</label>
       <input id="academic-year" pattern="\d{4}/\d{4}">
-      <button class="primary" id="save-school" style="margin-top: 16px;">${'' /* icon in JS */} Save changes</button>
+      <button class="primary" id="save-school" style="margin-top: 16px;">Save changes</button>
     </div>
 
     <div class="card" style="margin-bottom: 16px;">
@@ -35,7 +35,7 @@
         <h3>Admin PIN</h3>
       </div>
       <p>Change the PIN used to manage students and settings.</p>
-      <button id="btn-change-pin">${''} Change PIN</button>
+      <button id="btn-change-pin">Change PIN</button>
     </div>
 
     <div class="card" style="margin-bottom: 16px;">
@@ -45,8 +45,8 @@
       </div>
       <p class="muted" id="backup-summary">Loading…</p>
       <div class="row" style="margin-top: 12px;">
-        <button id="btn-backup-now" class="primary">${''} Back up now</button>
-        <button id="btn-restore">${''} Restore from file…</button>
+        <button id="btn-backup-now" class="primary">Back up now</button>
+        <button id="btn-restore">Restore from file…</button>
       </div>
       <h4 style="margin: 20px 0 8px; font-size: 14px; text-transform: uppercase; color: var(--c-text-muted); letter-spacing: 0.05em;">Existing backups</h4>
       <div class="table-wrap" style="border: none; box-shadow: none;">
@@ -63,7 +63,7 @@
         <h3>Server</h3>
       </div>
       <p class="muted">Restart the server (only needed after restore or app updates).</p>
-      <button id="btn-restart" class="danger">${''} Restart server</button>
+      <button id="btn-restart" class="danger">Restart server</button>
     </div>
   </main>
 
@@ -89,10 +89,11 @@
         const config = await API.get('/api/config/all');
         const topbar = Layout.renderTopbar({ active: 'settings', schoolName: config.school_name, backup: null });
         const mount = document.getElementById('topbar-mount');
-        mount.replaceWith(topbar);
+        if (mount) mount.replaceWith(topbar); else document.body.prepend(topbar);
         topbar.id = 'topbar-mount';
       } catch {}
-      document.getElementById('footer-mount').replaceWith(Layout.renderFooter());
+      const fm = document.getElementById('footer-mount');
+      if (fm) fm.replaceWith(Layout.renderFooter());
 
       await loadConfig();
       await loadBackups();

@@ -133,7 +133,8 @@
       });
     });
 
-    document.getElementById('footer-mount').replaceWith(Layout.renderFooter());
+    const fm = document.getElementById('footer-mount');
+    if (fm) fm.replaceWith(Layout.renderFooter());
   </script>
 </body>
 </html>

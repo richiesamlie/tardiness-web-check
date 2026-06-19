@@ -33,7 +33,8 @@
 
     async function init() {
       try {
-        document.getElementById('footer-mount').replaceWith(Layout.renderFooter());
+        const fm = document.getElementById('footer-mount');
+        if (fm) fm.replaceWith(Layout.renderFooter());
         const status = await API.get('/api/wizard/status');
         if (status.completed) { window.location.href = '/'; return; }
         if (status.has_school) data.school_name = (await API.get('/api/config')).school_name || '';

@@ -65,10 +65,8 @@ function createApp({ db = null, dbPath = null } = {}) {
   app.use('/api', backupRouter);
   app.use('/api', diagnosticsRouter);
 
-  // Static files (frontend)
-  app.use(express.static(path.join(__dirname, '..', 'public')));
-
   // Default route → wizard if not done, tardiness check otherwise
+  // (must come BEFORE static so it actually runs)
   app.get('/', (req, res) => {
     if (db) {
       try {
@@ -78,6 +76,9 @@ function createApp({ db = null, dbPath = null } = {}) {
     }
     res.redirect('/index.html');
   });
+
+  // Static files (frontend) — must come AFTER the / redirect
+  app.use(express.static(path.join(__dirname, '..', 'public')));
 
   // Health endpoint — deeper checks than just "alive"
   app.get('/api/health', (req, res) => {
