@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Log in — Tardiness Check</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <main class="container narrow" style="padding-top: 64px;">
+    <div class="card" style="text-align: center;">
+      <h1 style="margin-top: 0;">Enter admin PIN</h1>
+      <p class="muted">Required to manage students, change settings, or make backups.</p>
+
+      <label for="pin" style="margin-top: 16px;">PIN</label>
+      <input id="pin" type="password" inputmode="numeric" pattern="\d{4,8}" maxlength="8" autofocus style="text-align: center; font-size: 24px; letter-spacing: 8px;">
+
+      <div id="error" class="error hidden" style="margin-top: 12px;"></div>
+
+      <button id="login" class="primary big" style="width: 100%; margin-top: 16px;">Log in</button>
+
+      <p style="margin-top: 24px;"><a href="#" id="forgot">Forgot PIN? Use recovery code</a></p>
+    </div>
+
+    <div id="footer-mount"></div>
+  </main>
+
+  <script src="/js/common.js"></script>
+  <script>
+    document.getElementById('pin').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('login').click();
+    });
+
+    document.getElementById('login').addEventListener('click', async () => {
+      const pin = document.getElementById('pin').value;
+      if (!/^\d{4,8}$/.test(pin)) {
+        showError('PIN must be 4-8 digits');
+        return;
+      }
+      Auth.setPin(pin);
+      const ok = await Auth.pingPin();
+      if (ok) {
+        toast({ message: 'Logged in', type: 'success', duration: 1500 });
+        setTimeout(() => { window.location.href = '/index.html'; }, 500);
+      } else {
+        Auth.setPin('');
+        showError('Wrong PIN. Try again.');
+        document.getElementById('pin').value = '';
+        document.getElementById('pin').focus();
+      }
+    });
+
+    function showError(msg) {
+      const e = document.getElementById('error');
+      e.textContent = msg;
+      e.classList.remove('hidden');
+    }
+
+    document.getElementById('forgot').addEventListener('click', (e) => {
+      e.preventDefault();
+      const body = document.createElement('div');
+      body.innerHTML = `
+        <p>Enter your recovery code and choose a new PIN.</p>
+        <label>Recovery code (XXXX-XXXX-XXXX-XXXX)</label>
+        <input id="rc" placeholder="XXXX-XXXX-XXXX-XXXX" style="text-transform: uppercase;">
+        <label style="margin-top: 12px;">New PIN</label>
+        <input id="np" type="password" inputmode="numeric" maxlength="8">
+        <label style="margin-top: 12px;">Confirm new PIN</label>
+        <input id="np2" type="password" inputmode="numeric" maxlength="8">
+      `;
+      showModal({
+        title: 'Reset PIN with recovery code',
+        body,
+        actions: [
+          { label: 'Cancel' },
+          { label: 'Reset PIN', class: 'primary', onClick: async () => {
+            const rc = document.getElementById('rc').value.trim().toUpperCase();
+            const np = document.getElementById('np').value;
+            const np2 = document.getElementById('np2').value;
+            if (np !== np2) throw new Error('PINs do not match');
+            const res = await API.post('/api/wizard/reset-pin', { recovery_code: rc, pin: np, pin_confirm: np2 });
+            Auth.setPin(np);
+            toast({ message: 'PIN reset. New recovery code: ' + res.recovery_code, type: 'success', duration: 8000 });
+            setTimeout(() => { window.location.href = '/'; }, 1500);
+          }},
+        ],
+      });
+    });
+
+    document.getElementById('footer-mount').replaceWith(Layout.renderFooter());
+  </script>
+</body>
+</html>

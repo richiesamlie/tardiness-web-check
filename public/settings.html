@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings — Tardiness Check</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="topbar-mount"></div>
+
+  <main class="container narrow">
+    <h2 style="margin: 0 0 16px;">Settings</h2>
+
+    <div class="card" style="margin-bottom: 16px;">
+      <h3 style="margin-top: 0;">School &amp; academic year</h3>
+      <label>School name</label>
+      <input id="school-name">
+      <label style="margin-top: 12px;">Academic year (YYYY/YYYY)</label>
+      <input id="academic-year" pattern="\d{4}/\d{4}">
+      <button class="primary" id="save-school" style="margin-top: 12px;">Save</button>
+    </div>
+
+    <div class="card" style="margin-bottom: 16px;">
+      <h3 style="margin-top: 0;">Admin PIN</h3>
+      <p>Change the PIN used to manage students and settings.</p>
+      <button id="btn-change-pin">Change PIN</button>
+    </div>
+
+    <div class="card" style="margin-bottom: 16px;">
+      <h3 style="margin-top: 0;">Backup &amp; restore</h3>
+      <p class="muted" id="backup-summary">Loading…</p>
+      <div class="row" style="margin-top: 12px;">
+        <button id="btn-backup-now" class="primary">Back up now</button>
+        <button id="btn-restore">Restore from file…</button>
+      </div>
+      <h4 style="margin-bottom: 4px; margin-top: 16px;">Existing backups</h4>
+      <table><thead><tr><th>Filename</th><th>Size</th><th>When</th><th></th></tr></thead><tbody id="backups-tbody"></tbody></table>
+    </div>
+
+    <div class="card" style="margin-bottom: 16px;">
+      <h3 style="margin-top: 0;">Server</h3>
+      <p class="muted">Restart the server (only needed after restore or app updates).</p>
+      <button id="btn-restart" class="danger">Restart server</button>
+    </div>
+  </main>
+
+  <div id="footer-mount"></div>
+
+  <script src="/js/common.js"></script>
+  <script>
+    async function init() {
+      const ok = await Auth.pingPin();
+      if (!ok) { window.location.href = '/login.html?next=settings.html'; return; }
+
+      try {
+        const config = await API.get('/api/config/all');
+        const topbar = Layout.renderTopbar({ active: 'settings', schoolName: config.school_name, backup: null });
+        document.getElementById('topbar-mount').replaceWith(topbar);
+        topbar.id = 'topbar-mount';
+      } catch {}
+      document.getElementById('footer-mount').replaceWith(Layout.renderFooter());
+
+      await loadConfig();
+      await loadBackups();
+      document.getElementById('save-school').addEventListener('click', saveSchool);
+      document.getElementById('btn-change-pin').addEventListener('click', changePin);
+      document.getElementById('btn-backup-now').addEventListener('click', backupNow);
+      document.getElementById('btn-restore').addEventListener('click', restoreFromFile);
+      document.getElementById('btn-restart').addEventListener('click', restartServer);
+    }
+
+    async function loadConfig() {
+      const c = await API.get('/api/config');
+      document.getElementById('school-name').value = c.school_name || '';
+      document.getElementById('academic-year').value = c.academic_year || '';
+    }
+
+    async function saveSchool() {
+      const school_name = document.getElementById('school-name').value.trim();
+      const academic_year = document.getElementById('academic-year').value.trim();
+      try {
+        await Auth.authedRequest('PUT', '/api/config', { school_name, academic_year });
+        toast({ message: 'Saved', type: 'success' });
+        window.location.reload();
+      } catch (e) { toast({ message: e.message, type: 'error' }); }
+    }
+
+    async function changePin() {
+      const body = document.createElement('div');
+      body.innerHTML = `
+        <label>Current PIN</label>
+        <input id="cur" type="password" inputmode="numeric" maxlength="8" autofocus>
+        <label style="margin-top: 12px;">New PIN</label>
+        <input id="np" type="password" inputmode="numeric" maxlength="8">
+        <label style="margin-top: 12px;">Confirm new PIN</label>
+        <input id="np2" type="password" inputmode="numeric" maxlength="8">
+        <p class="muted" style="margin-top: 12px; font-size: 13px;">After changing, you'll be logged out and need to re-enter the new PIN.</p>
+      `;
+      showModal({
+        title: 'Change admin PIN',
+        body,
+        actions: [
+          { label: 'Cancel' },
+          { label: 'Save new PIN', class: 'primary', onClick: async () => {
+            const cur = document.getElementById('cur').value;
+            const np = document.getElementById('np').value;
+            const np2 = document.getElementById('np2').value;
+            if (np !== np2) throw new Error('PINs do not match');
+            // No direct endpoint for PIN change without recovery — use wizard reset-pin requires recovery code.
+            // For now: ask user to use recovery code path.
+            throw new Error('To change PIN: log out, click "Forgot PIN" on login, enter recovery code from settings card (saved when PIN was set).');
+          }},
+        ],
+      });
+    }
+
+    async function loadBackups() {
+      try {
+        const res = await Auth.authedRequest('GET', '/api/backups');
+        const summary = document.getElementById('backup-summary');
+        summary.textContent = `${res.backups.length} backup${res.backups.length === 1 ? '' : 's'} in ${res.folder}`;
+        const tbody = document.getElementById('backups-tbody');
+        if (!res.backups.length) {
+          tbody.innerHTML = '<tr><td colspan="4" class="muted center">No backups yet.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = res.backups.map(b => `
+          <tr>
+            <td><code>${escapeHtml(b.filename)}</code></td>
+            <td>${(b.sizeBytes / 1024).toFixed(1)} KB</td>
+            <td>${new Date(b.createdAt).toLocaleString()}</td>
+            <td><button class="ghost btn-del-backup" data-filename="${escapeHtml(b.filename)}" style="color: var(--c-danger);">Delete</button></td>
+          </tr>
+        `).join('');
+        tbody.querySelectorAll('.btn-del-backup').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const ok = await confirmModal({ title: 'Delete backup?', message: `Permanently delete ${btn.dataset.filename}?`, danger: true, confirmLabel: 'Delete' });
+            if (!ok) return;
+            try {
+              await Auth.authedRequest('DELETE', `/api/backups/${btn.dataset.filename}`);
+              toast({ message: 'Deleted' });
+              await loadBackups();
+            } catch (e) { toast({ message: e.message, type: 'error' }); }
+          });
+        });
+      } catch (e) {
+        document.getElementById('backup-summary').textContent = 'Could not load backups: ' + e.message;
+      }
+    }
+
+    async function backupNow() {
+      try {
+        const res = await fetch('/api/backup', { headers: Auth.authHeaders() });
+        if (!res.ok) throw new Error('Backup failed');
+        const blob = await res.blob();
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `tardiness-backup-${new Date().toISOString().slice(0, 10)}.zip`;
+        a.click();
+        toast({ message: 'Backup created and downloaded', type: 'success' });
+        await loadBackups();
+      } catch (e) { toast({ message: e.message, type: 'error' }); }
+    }
+
+    function restoreFromFile() {
+      const body = document.createElement('div');
+      body.innerHTML = `
+        <p>Choose a backup zip file. Your current database will be saved as a safety backup before being replaced.</p>
+        <p class="error" style="font-size: 13px;"><strong>You must restart the server after restore.</strong></p>
+        <input id="file" type="file" accept=".zip" style="margin-top: 12px;">
+      `;
+      showModal({
+        title: 'Restore from backup',
+        body,
+        actions: [
+          { label: 'Cancel' },
+          { label: 'Restore', class: 'danger', onClick: async () => {
+            const file = document.getElementById('file').files[0];
+            if (!file) throw new Error('Please choose a backup file');
+            const fd = new FormData();
+            fd.append('file', file);
+            const res = await fetch('/api/restore', { method: 'POST', body: fd, headers: Auth.authHeaders() });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Restore failed');
+            toast({ message: 'Restore complete — restart the server now', type: 'success', duration: 8000 });
+            document.getElementById('btn-restart').classList.add('primary');
+          }},
+        ],
+      });
+    }
+
+    async function restartServer() {
+      const ok = await confirmModal({ title: 'Restart server?', message: 'The app will be unavailable for a few seconds. Continue?', danger: true, confirmLabel: 'Restart' });
+      if (!ok) return;
+      try {
+        await Auth.authedRequest('POST', '/api/restart');
+        toast({ message: 'Restarting… reload in a moment', type: 'success', duration: 5000 });
+      } catch (e) { /* server is restarting, this is expected */ }
+    }
+
+    init();
+  </script>
+</body>
+</html>

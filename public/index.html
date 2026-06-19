@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Tardiness Check — Mark Late</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#2563eb">
+</head>
+<body>
+  <div id="topbar-mount"></div>
+
+  <main class="container narrow">
+    <h2 style="margin: 8px 0 4px;">Mark a student late</h2>
+    <p class="muted">Search by name or student ID. Tap to mark.</p>
+
+    <input id="search" class="large" type="search" placeholder="Type a name…" autofocus autocomplete="off">
+
+    <div id="results" class="student-results"></div>
+
+    <div id="recent-section" style="margin-top: 32px;" hidden>
+      <h3 style="margin-bottom: 8px;">Recently marked</h3>
+      <div id="recent" class="recent-marks"></div>
+      <button id="undo-last" class="ghost" style="margin-top: 12px;" hidden>Undo last mark</button>
+    </div>
+  </main>
+
+  <div id="footer-mount"></div>
+
+  <script src="/js/common.js"></script>
+  <script>
+    // ============ Tardiness Check page ============
+
+    let allStudents = [];
+    let recentMarks = [];  // newest first
+    let lastMarked = null;  // for undo
+
+    async function init() {
+      try {
+        const config = await API.get('/api/config');
+        const backup = await API.get('/api/health').then(h => h.backup).catch(() => null);
+        const topbar = Layout.renderTopbar({ active: 'mark', schoolName: config.school_name, backup });
+        document.getElementById('topbar-mount').replaceWith(topbar);
+        topbar.id = 'topbar-mount';
+      } catch (e) {
+        console.error('init failed', e);
+      }
+      document.getElementById('footer-mount').replaceWith(Layout.renderFooter());
+
+      await loadStudents();
+      await loadToday();
+      wireSearch();
+    }
+
+    async function loadStudents() {
+      const res = await API.get('/api/students?limit=500');
+      allStudents = res.items;
+    }
+
+    async function loadToday() {
+      try {
+        const res = await API.get('/api/tardiness/today');
+        recentMarks = res.items;
+        renderRecent();
+      } catch { /* ok */ }
+    }
+
+    function wireSearch() {
+      const search = document.getElementById('search');
+      search.addEventListener('input', renderResults);
+      search.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          const first = document.querySelector('.student-tile');
+          if (first) first.click();
+        }
+      });
+      search.focus();
+    }
+
+    function renderResults() {
+      const q = document.getElementById('search').value.trim().toLowerCase();
+      const container = document.getElementById('results');
+      if (!q) { container.innerHTML = ''; return; }
+
+      const matches = allStudents
+        .filter(s => s.full_name.toLowerCase().includes(q) || s.student_id.toLowerCase().includes(q))
+        .slice(0, 20);
+
+      if (matches.length === 0) {
+        container.innerHTML = '<p class="muted">No students match. Try a different name.</p>';
+        return;
+      }
+
+      container.innerHTML = matches.map(s => `
+        <div class="student-tile" data-id="${s.id}" data-sid="${escapeHtml(s.student_id)}" data-name="${escapeHtml(s.full_name)}" data-class="${escapeHtml(s.class)}" data-late="${s.late_count || 0}">
+          <div class="grow">
+            <div class="name">${escapeHtml(s.full_name)}</div>
+            <div class="class-name">${escapeHtml(s.class)} · ID ${escapeHtml(s.student_id)}</div>
+          </div>
+          ${lateBadge(s.late_count)}
+        </div>
+      `).join('');
+
+      container.querySelectorAll('.student-tile').forEach(tile => {
+        tile.addEventListener('click', () => openMarkModal(tile.dataset));
+      });
+    }
+
+    function openMarkModal(data) {
+      const body = document.createElement('div');
+      body.innerHTML = `
+        <p>Mark <strong>${escapeHtml(data.name)}</strong> (${escapeHtml(data.class)}) late at <strong>${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong>?</p>
+        <label for="reason">Reason (optional)</label>
+        <select id="reason">
+          <option value="">— none —</option>
+          <option value="traffic">Traffic</option>
+          <option value="medical">Medical</option>
+          <option value="family">Family</option>
+          <option value="other">Other</option>
+        </select>
+        <p class="muted faint" style="margin-top: 8px; font-size: 13px;">This student has been late <strong>${data.late}</strong> time${data.late === '1' ? '' : 's'} this academic year.</p>
+      `;
+      showModal({
+        title: 'Confirm late mark',
+        body,
+        actions: [
+          { label: 'Cancel' },
+          { label: 'Mark late', class: 'primary', onClick: async () => {
+            const reason = document.getElementById('reason').value;
+            await markLate(parseInt(data.id, 10), reason || null, data);
+          }},
+        ],
+      });
+    }
+
+    async function markLate(studentId, notes, data) {
+      try {
+        const res = await API.post('/api/tardiness', { student_id: studentId, notes, recorded_by: 'gate' });
+        beep();
+        lastMarked = { id: res.id, student_id: studentId, name: data.name, ts: Date.now() };
+        recentMarks.unshift(res);
+        renderRecent();
+        // Update student late_count locally
+        const s = allStudents.find(x => x.id === studentId);
+        if (s) s.late_count = (s.late_count || 0) + 1;
+        document.getElementById('search').value = '';
+        document.getElementById('results').innerHTML = '';
+        toast({
+          message: `${data.name} marked late`,
+          type: 'success',
+          duration: 6000,
+          actions: [{ label: 'Undo', onClick: undoLastMark }],
+        });
+      } catch (e) {
+        toast({ message: `Could not mark: ${e.message}`, type: 'error' });
+        throw e;  // keep modal open
+      }
+    }
+
+    async function undoLastMark() {
+      if (!lastMarked) return;
+      // The API doesn't have DELETE for events in v1, so we add a "negate" record manually
+      // For v1 we display "undo available" but actual undo requires DELETE /api/tardiness/:id
+      // Simpler: just remove from recent list and notify. A full undo can be added later.
+      toast({ message: 'Undo not yet supported — contact admin to remove a mark', duration: 5000 });
+    }
+
+    function renderRecent() {
+      const sec = document.getElementById('recent-section');
+      const list = document.getElementById('recent');
+      if (!recentMarks.length) { sec.hidden = true; return; }
+      sec.hidden = false;
+      list.innerHTML = recentMarks.slice(0, 10).map(m => `
+        <div class="recent-mark">
+          <strong>${escapeHtml(m.full_name)}</strong>
+          <span class="muted">${escapeHtml(m.class)}</span>
+          <span class="spacer"></span>
+          <span class="muted">${formatTime(m.occurred_at)}</span>
+          ${m.notes ? `<span class="badge">${escapeHtml(m.notes)}</span>` : ''}
+        </div>
+      `).join('');
+    }
+
+    function formatTime(s) {
+      // occurred_at is "YYYY-MM-DD HH:MM:SS" UTC; show HH:MM
+      const m = s && s.match(/(\d{2}):(\d{2}):/);
+      return m ? `${m[1]}:${m[2]}` : '';
+    }
+
+    init();
+  </script>
+</body>
+</html>

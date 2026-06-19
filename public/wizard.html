@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>First-run Setup — Tardiness Check</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <main class="container narrow" style="padding-top: 32px;">
+    <h1 style="margin-bottom: 4px;">Welcome to Tardiness Check</h1>
+    <p class="muted" style="margin-top: 0;">Let's set things up. This only takes a minute.</p>
+
+    <div class="wizard-progress" id="progress">
+      <div class="step" data-step="1"></div>
+      <div class="step" data-step="2"></div>
+      <div class="step" data-step="3"></div>
+      <div class="step" data-step="4"></div>
+    </div>
+
+    <div id="wizard-content" class="card"></div>
+  </main>
+
+  <div id="footer-mount"></div>
+
+  <script src="/js/common.js"></script>
+  <script>
+    let currentStep = 1;
+    const data = { school_name: '', academic_year: '', pin: '', pin_confirm: '', recovery_code: null };
+
+    async function init() {
+      try {
+        const status = await API.get('/api/wizard/status');
+        if (status.completed) { window.location.href = '/'; return; }
+        if (status.has_school) data.school_name = (await API.get('/api/config')).school_name || '';
+        if (status.has_year) data.academic_year = (await API.get('/api/config')).academic_year || '';
+        // Skip to next incomplete step
+        if (status.has_school) currentStep = 2;
+        if (status.has_year) currentStep = 3;
+        if (status.has_pin) currentStep = 4;
+        render();
+      } catch (e) {
+        toast({ message: 'Could not load wizard status: ' + e.message, type: 'error' });
+      }
+      document.getElementById('footer-mount').replaceWith(Layout.renderFooter());
+    }
+
+    function render() {
+      updateProgress();
+      const c = document.getElementById('wizard-content');
+      if (currentStep === 1) renderStep1(c);
+      else if (currentStep === 2) renderStep2(c);
+      else if (currentStep === 3) renderStep3(c);
+      else if (currentStep === 4) renderStep4(c);
+    }
+
+    function updateProgress() {
+      document.querySelectorAll('.wizard-progress .step').forEach(el => {
+        const s = parseInt(el.dataset.step, 10);
+        el.classList.remove('done', 'current');
+        if (s < currentStep) el.classList.add('done');
+        else if (s === currentStep) el.classList.add('current');
+      });
+    }
+
+    // ===== Step 1: School name =====
+    function renderStep1(c) {
+      c.innerHTML = `
+        <h2>1. What's your school called?</h2>
+        <p class="muted">This appears in the top bar of every page.</p>
+        <label for="school">School name</label>
+        <input id="school" type="text" value="${escapeHtml(data.school_name)}" placeholder="e.g. Elyon Christian Primary School" autofocus>
+        <div class="modal-actions">
+          <button class="primary big" id="next">Next</button>
+        </div>
+      `;
+      document.getElementById('school').focus();
+      document.getElementById('next').addEventListener('click', async () => {
+        const v = document.getElementById('school').value.trim();
+        if (!v) return toast({ message: 'Please enter a school name', type: 'error' });
+        data.school_name = v;
+        await API.post('/api/wizard/step/school', { school_name: v });
+        currentStep = 2;
+        render();
+      });
+      document.getElementById('school').addEventListener('keydown', e => {
+        if (e.key === 'Enter') document.getElementById('next').click();
+      });
+    }
+
+    // ===== Step 2: Academic year =====
+    function renderStep2(c) {
+      const suggestions = [];
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = now.getMonth();
+      // If July-December, current year is start; else previous year
+      const startYear = m >= 6 ? y : y - 1;
+      for (let i = -1; i <= 2; i++) {
+        suggestions.push(`${startYear + i}/${startYear + i + 1}`);
+      }
+      c.innerHTML = `
+        <h2>2. What academic year is it?</h2>
+        <p class="muted">Format: YYYY/YYYY (e.g. ${suggestions[1]})</p>
+        <div class="wizard-options" id="year-options">
+          ${suggestions.map(y => `<div class="wizard-option" data-year="${y}">${y}</div>`).join('')}
+        </div>
+        <label for="year" style="margin-top: 12px;">Or type a custom year</label>
+        <input id="year" type="text" value="${escapeHtml(data.academic_year || suggestions[1])}" placeholder="YYYY/YYYY" pattern="\\d{4}/\\d{4}">
+        <div class="modal-actions">
+          <button id="back">Back</button>
+          <button class="primary big" id="next">Next</button>
+        </div>
+      `;
+      document.querySelectorAll('#year-options .wizard-option').forEach(el => {
+        el.addEventListener('click', () => {
+          document.getElementById('year').value = el.dataset.year;
+        });
+      });
+      document.getElementById('back').addEventListener('click', () => { currentStep = 1; render(); });
+      document.getElementById('next').addEventListener('click', async () => {
+        const v = document.getElementById('year').value.trim();
+        if (!/^\d{4}\/\d{4}$/.test(v)) return toast({ message: 'Use format YYYY/YYYY (e.g. 2025/2026)', type: 'error' });
+        data.academic_year = v;
+        await API.post('/api/wizard/step/year', { academic_year: v });
+        currentStep = 3;
+        render();
+      });
+    }
+
+    // ===== Step 3: PIN =====
+    function renderStep3(c) {
+      c.innerHTML = `
+        <h2>3. Create an admin PIN</h2>
+        <p class="muted">You'll enter this PIN when adding students, changing settings, or making backups.</p>
+        <label for="pin">PIN (4–8 digits)</label>
+        <input id="pin" type="password" inputmode="numeric" pattern="\\d{4,8}" maxlength="8" autofocus>
+        <label for="pin2" style="margin-top: 12px;">Confirm PIN</label>
+        <input id="pin2" type="password" inputmode="numeric" pattern="\\d{4,8}" maxlength="8">
+        <div class="modal-actions">
+          <button id="back">Back</button>
+          <button class="primary big" id="next">Next</button>
+        </div>
+      `;
+      document.getElementById('pin').focus();
+      document.getElementById('back').addEventListener('click', () => { currentStep = 2; render(); });
+      document.getElementById('next').addEventListener('click', async () => {
+        const pin = document.getElementById('pin').value;
+        const pin2 = document.getElementById('pin2').value;
+        if (pin !== pin2) return toast({ message: 'PINs do not match', type: 'error' });
+        try {
+          const res = await API.post('/api/wizard/step/pin', { pin, pin_confirm: pin2 });
+          data.recovery_code = res.recovery_code;
+          data.pin = pin;
+          currentStep = 4;
+          render();
+        } catch (e) {
+          toast({ message: e.message || 'Could not set PIN', type: 'error' });
+        }
+      });
+    }
+
+    // ===== Step 4: Recovery code + Finish =====
+    function renderStep4(c) {
+      c.innerHTML = `
+        <h2>4. Save your recovery code</h2>
+        <p class="muted"><strong>This is the ONLY way to reset your PIN if you forget it.</strong></p>
+        <p class="muted">Write it down and keep it somewhere safe (printed card, locked drawer). This is the only time we'll show it.</p>
+        <div class="recovery-code">${escapeHtml(data.recovery_code)}</div>
+        <p style="margin-top: 16px;">You can also import students now, or do it later from the Roster page.</p>
+        <div class="modal-actions">
+          <button id="skip">Skip — add students later</button>
+          <button id="download" class="primary big">Download template + finish</button>
+        </div>
+      `;
+      document.getElementById('skip').addEventListener('click', async () => { await finishWizard(); });
+      document.getElementById('download').addEventListener('click', async () => {
+        // Trigger template download then finish
+        window.location.href = '/api/template?format=xlsx';
+        await finishWizard();
+      });
+    }
+
+    async function finishWizard() {
+      try {
+        await API.post('/api/wizard/complete');
+        Auth.setPin(data.pin);
+        toast({ message: 'Setup complete! Welcome aboard.', type: 'success', duration: 3000 });
+        setTimeout(() => { window.location.href = '/'; }, 800);
+      } catch (e) {
+        toast({ message: 'Could not finish wizard: ' + e.message, type: 'error' });
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Roster — Tardiness Check</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="topbar-mount"></div>
+
+  <main class="container wide">
+    <div class="row between" style="margin-bottom: 16px;">
+      <h2 style="margin: 0;">Students</h2>
+      <div class="row">
+        <button id="btn-add" class="primary">+ Add student</button>
+        <button id="btn-import">Import</button>
+        <div class="dropdown" style="position: relative;">
+          <button id="btn-export">Export ▾</button>
+          <div id="export-menu" class="card hidden" style="position: absolute; right: 0; top: 100%; margin-top: 4px; padding: 4px; min-width: 200px; z-index: 100;">
+            <button class="ghost" style="display: block; width: 100%; text-align: left;" data-fmt="xlsx">Export as Excel (.xlsx)</button>
+            <button class="ghost" style="display: block; width: 100%; text-align: left;" data-fmt="csv">Export as CSV (.csv)</button>
+            <hr style="margin: 4px 0; border: none; border-top: 1px solid var(--c-border);">
+            <button class="ghost" style="display: block; width: 100%; text-align: left;" data-scope="tardiness" data-fmt="xlsx">Export tardiness events (XLSX)</button>
+            <button class="ghost" style="display: block; width: 100%; text-align: left;" data-scope="tardiness" data-fmt="csv">Export tardiness events (CSV)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row" style="margin-bottom: 12px;">
+      <input id="search" type="search" placeholder="Search by name or ID…" style="max-width: 360px;">
+      <select id="class-filter" style="max-width: 240px;">
+        <option value="">All classes</option>
+      </select>
+      <span class="spacer"></span>
+      <span id="count" class="muted"></span>
+    </div>
+
+    <table id="students-table">
+      <thead>
+        <tr>
+          <th>Student ID</th>
+          <th>Name</th>
+          <th>Class</th>
+          <th style="width: 100px;">Late count</th>
+          <th style="width: 140px;">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+
+    <div id="pagination" class="row between" style="margin-top: 16px;"></div>
+  </main>
+
+  <div id="footer-mount"></div>
+
+  <script src="/js/common.js"></script>
+  <script>
+    let students = [];
+    let page = 1;
+    const limit = 50;
+
+    async function init() {
+      // Require PIN
+      const ok = await Auth.pingPin();
+      if (!ok) { window.location.href = '/login.html?next=roster.html'; return; }
+
+      try {
+        const config = await API.get('/api/config');
+        const backup = await API.get('/api/health').then(h => h.backup).catch(() => null);
+        const topbar = Layout.renderTopbar({ active: 'roster', schoolName: config.school_name, backup });
+        document.getElementById('topbar-mount').replaceWith(topbar);
+        topbar.id = 'topbar-mount';
+      } catch (e) { console.error(e); }
+      document.getElementById('footer-mount').replaceWith(Layout.renderFooter());
+
+      document.getElementById('search').addEventListener('input', () => { page = 1; load(); });
+      document.getElementById('class-filter').addEventListener('change', () => { page = 1; load(); });
+      document.getElementById('btn-add').addEventListener('click', openAddModal);
+      document.getElementById('btn-import').addEventListener('click', openImportModal);
+      document.getElementById('btn-export').addEventListener('click', (e) => {
+        e.stopPropagation();
+        document.getElementById('export-menu').classList.toggle('hidden');
+      });
+      document.addEventListener('click', () => document.getElementById('export-menu').classList.add('hidden'));
+      document.getElementById('export-menu').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-fmt]');
+        if (!btn) return;
+        doExport(btn.dataset.scope || 'students', btn.dataset.fmt);
+      });
+
+      await loadClasses();
+      await load();
+    }
+
+    async function loadClasses() {
+      try {
+        const res = await API.get('/api/students?limit=500');
+        const classes = [...new Set(res.items.map(s => s.class))].sort();
+        const sel = document.getElementById('class-filter');
+        for (const c of classes) {
+          const opt = document.createElement('option');
+          opt.value = c;
+          opt.textContent = c;
+          sel.appendChild(opt);
+        }
+      } catch {}
+    }
+
+    async function load() {
+      const search = document.getElementById('search').value.trim();
+      const cls = document.getElementById('class-filter').value;
+      const params = new URLSearchParams({ page, limit });
+      if (search) params.set('search', search);
+      if (cls) params.set('class', cls);
+
+      const res = await Auth.authedRequest('GET', `/api/students?${params}`);
+      students = res.items;
+      document.getElementById('count').textContent = `${res.total} student${res.total === 1 ? '' : 's'}`;
+      render();
+
+      const totalPages = Math.max(1, Math.ceil(res.total / limit));
+      const pg = document.getElementById('pagination');
+      pg.innerHTML = `
+        <button id="prev" ${page <= 1 ? 'disabled' : ''}>‹ Prev</button>
+        <span class="muted">Page ${page} of ${totalPages}</span>
+        <button id="next" ${page >= totalPages ? 'disabled' : ''}>Next ›</button>
+      `;
+      pg.querySelector('#prev').addEventListener('click', () => { page--; load(); });
+      pg.querySelector('#next').addEventListener('click', () => { page++; load(); });
+    }
+
+    function render() {
+      const tbody = document.getElementById('tbody');
+      if (!students.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="muted center" style="padding: 24px;">No students yet. Click <strong>+ Add student</strong> or <strong>Import</strong> to get started.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = students.map(s => `
+        <tr data-id="${s.id}">
+          <td><code>${escapeHtml(s.student_id)}</code></td>
+          <td><strong>${escapeHtml(s.full_name)}</strong></td>
+          <td>${escapeHtml(s.class)}</td>
+          <td>${lateBadge(s.late_count)}</td>
+          <td>
+            <button class="ghost btn-edit" data-id="${s.id}">Edit</button>
+            <button class="ghost btn-del" data-id="${s.id}" data-name="${escapeHtml(s.full_name)}" style="color: var(--c-danger);">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+      tbody.querySelectorAll('.btn-edit').forEach(b => b.addEventListener('click', () => openEditModal(parseInt(b.dataset.id, 10))));
+      tbody.querySelectorAll('.btn-del').forEach(b => b.addEventListener('click', () => doDelete(parseInt(b.dataset.id, 10), b.dataset.name)));
+    }
+
+    function openAddModal() { openStudentModal(null); }
+
+    function openEditModal(id) {
+      const s = students.find(x => x.id === id);
+      if (s) openStudentModal(s);
+    }
+
+    function openStudentModal(existing) {
+      const body = document.createElement('div');
+      body.innerHTML = `
+        <label>Student ID (school ID)</label>
+        <input id="f-sid" value="${existing ? escapeHtml(existing.student_id) : ''}" ${existing ? 'disabled' : ''}>
+        <label style="margin-top: 12px;">Full name</label>
+        <input id="f-name" value="${existing ? escapeHtml(existing.full_name) : ''}">
+        <label style="margin-top: 12px;">Class</label>
+        <input id="f-class" value="${existing ? escapeHtml(existing.class) : ''}">
+      `;
+      showModal({
+        title: existing ? 'Edit student' : 'Add student',
+        body,
+        actions: [
+          { label: 'Cancel' },
+          { label: existing ? 'Save' : 'Add', class: 'primary', onClick: async () => {
+            const sid = (existing ? existing.student_id : document.getElementById('f-sid').value).trim();
+            const name = document.getElementById('f-name').value.trim();
+            const cls = document.getElementById('f-class').value.trim();
+            if (!sid || !name || !cls) throw new Error('All fields are required');
+            try {
+              if (existing) {
+                await Auth.authedRequest('PUT', `/api/students/${existing.id}`, { full_name: name, class: cls });
+                toast({ message: 'Student updated', type: 'success' });
+              } else {
+                await Auth.authedRequest('POST', '/api/students', { student_id: sid, full_name: name, class: cls });
+                toast({ message: 'Student added', type: 'success' });
+              }
+              await load();
+            } catch (e) {
+              toast({ message: e.message, type: 'error' });
+              throw e;
+            }
+          }},
+        ],
+      });
+    }
+
+    async function doDelete(id, name) {
+      const ok = await confirmModal({
+        title: 'Delete student',
+        message: `Delete "${name}"? Their tardiness history will be preserved (the student record is soft-deleted).`,
+        confirmLabel: 'Delete',
+        danger: true,
+      });
+      if (!ok) return;
+      try {
+        await Auth.authedRequest('DELETE', `/api/students/${id}`);
+        toast({ message: 'Student deleted', type: 'success' });
+        await load();
+      } catch (e) {
+        toast({ message: e.message, type: 'error' });
+      }
+    }
+
+    async function doExport(scope, format) {
+      const params = new URLSearchParams({ scope, format });
+      const res = await fetch(`/api/export?${params}`, { headers: Auth.authHeaders() });
+      if (!res.ok) return toast({ message: 'Export failed', type: 'error' });
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const ext = format === 'csv' ? 'csv' : 'xlsx';
+      const today = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `${scope}-${today}.${ext}`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ message: `Exported ${scope} as ${format.toUpperCase()}`, type: 'success' });
+    }
+
+    function openImportModal() {
+      const body = document.createElement('div');
+      body.innerHTML = `
+        <p>Upload a <strong>.xlsx</strong> or <strong>.csv</strong> file with your student list.</p>
+        <p class="muted" style="font-size: 13px;">Need a template? <a href="/api/template?format=xlsx" target="_blank">Download Excel template</a> · <a href="/api/template?format=csv" target="_blank">Download CSV template</a></p>
+        <input id="file" type="file" accept=".xlsx,.csv" style="margin-top: 12px;">
+        <div id="preview-result" style="margin-top: 16px;"></div>
+      `;
+      const modal = showModal({
+        title: 'Import students',
+        body,
+        actions: [
+          { label: 'Cancel' },
+          { label: 'Preview', class: 'primary', onClick: async () => {
+            const file = document.getElementById('file').files[0];
+            if (!file) throw new Error('Please choose a file');
+            const fd = new FormData();
+            fd.append('file', file);
+            const res = await fetch('/api/import/preview', { method: 'POST', body: fd, headers: Auth.authHeaders() });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Preview failed');
+            const r = document.getElementById('preview-result');
+            r.innerHTML = `
+              <div class="card" style="background: var(--c-surface-2);">
+                <p><strong>${data.summary.new_count}</strong> new · <strong>${data.summary.update_count}</strong> to update · <strong>${data.summary.error_count}</strong> errors (of ${data.summary.total_rows} rows)</p>
+                ${data.summary.error_count > 0 ? `<details><summary>Show ${data.errors.length} errors</summary><ul style="font-size: 13px; max-height: 200px; overflow: auto;">${data.errors.map(e => `<li>Row ${e.row}: ${escapeHtml(e.reason)}</li>`).join('')}</ul></details>` : ''}
+                <button class="primary" id="apply-btn" style="margin-top: 12px;" ${data.summary.new_count + data.summary.update_count === 0 ? 'disabled' : ''}>
+                  Apply ${data.summary.new_count + data.summary.update_count} change${data.summary.new_count + data.summary.update_count === 1 ? '' : 's'}
+                </button>
+              </div>
+            `;
+            document.getElementById('apply-btn').addEventListener('click', async () => {
+              try {
+                const commit = await Auth.authedRequest('POST', '/api/import/commit', {
+                  rows: [...data.new_students, ...data.updated_students.map(u => ({ student_id: u.student_id, full_name: u.new_full_name, class: u.new_class }))],
+                });
+                toast({ message: `Added ${commit.added}, updated ${commit.updated}`, type: 'success' });
+                modal.close();
+                await load();
+              } catch (e) {
+                toast({ message: e.message, type: 'error' });
+              }
+            });
+            // Prevent modal from closing
+            throw false;
+          }},
+        ],
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>

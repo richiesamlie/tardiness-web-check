@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reports — Tardiness Check</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="topbar-mount"></div>
+
+  <main class="container wide">
+    <h2 style="margin: 0 0 16px;">Reports</h2>
+
+    <div class="stats-grid" id="stats-grid" style="margin-bottom: 24px;"></div>
+
+    <div class="card" style="margin-bottom: 16px;">
+      <div class="row between" style="margin-bottom: 8px;">
+        <h3 style="margin: 0;">Today's tardiness</h3>
+        <span id="today-count" class="muted"></span>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Time</th><th>Name</th><th>Class</th><th>Notes</th></tr>
+        </thead>
+        <tbody id="today-tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="card" style="margin-bottom: 16px;">
+      <h3 style="margin-top: 0;">By class</h3>
+      <table>
+        <thead><tr><th>Class</th><th>Students</th><th>Late events</th><th>Avg lates / student</th></tr></thead>
+        <tbody id="by-class-tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top: 0;">Top repeat offenders (this academic year)</h3>
+      <table>
+        <thead><tr><th>#</th><th>Name</th><th>Class</th><th>Times late</th></tr></thead>
+        <tbody id="top-tbody"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <div id="footer-mount"></div>
+
+  <script src="/js/common.js"></script>
+  <script>
+    async function init() {
+      try {
+        const config = await API.get('/api/config');
+        const backup = await API.get('/api/health').then(h => h.backup).catch(() => null);
+        const topbar = Layout.renderTopbar({ active: 'reports', schoolName: config.school_name, backup });
+        document.getElementById('topbar-mount').replaceWith(topbar);
+        topbar.id = 'topbar-mount';
+      } catch {}
+      document.getElementById('footer-mount').replaceWith(Layout.renderFooter());
+      await loadAll();
+    }
+
+    async function loadAll() {
+      const [stats, today] = await Promise.all([
+        API.get('/api/stats'),
+        API.get('/api/tardiness/today').catch(() => ({ items: [] })),
+      ]);
+      renderStats(stats);
+      renderToday(today, stats);
+      renderByClass(stats);
+      await renderTop();
+    }
+
+    function renderStats(s) {
+      const g = document.getElementById('stats-grid');
+      g.innerHTML = `
+        <div class="stat-card"><div class="stat-value">${s.total_active_students}</div><div class="stat-label">Active students</div></div>
+        <div class="stat-card"><div class="stat-value">${s.today_count}</div><div class="stat-label">Late today</div></div>
+        <div class="stat-card"><div class="stat-value">${s.total_events_this_year}</div><div class="stat-label">Lates this year</div></div>
+        <div class="stat-card"><div class="stat-value">${s.academic_year}</div><div class="stat-label">Academic year</div></div>
+      `;
+    }
+
+    function renderToday(today, stats) {
+      document.getElementById('today-count').textContent = `${today.total || 0} event${today.total === 1 ? '' : 's'}`;
+      const tbody = document.getElementById('today-tbody');
+      if (!today.items || !today.items.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="muted center">No one marked late today.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = today.items.map(e => `
+        <tr>
+          <td>${formatTime(e.occurred_at)}</td>
+          <td><strong>${escapeHtml(e.full_name)}</strong></td>
+          <td>${escapeHtml(e.class)}</td>
+          <td>${e.notes ? escapeHtml(e.notes) : '<span class="faint">—</span>'}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderByClass(stats) {
+      const tbody = document.getElementById('by-class-tbody');
+      if (!stats.per_class.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="muted center">No active students.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = stats.per_class.map(c => `
+        <tr>
+          <td><strong>${escapeHtml(c.class)}</strong></td>
+          <td>${c.student_count}</td>
+          <td>${c.event_count}</td>
+          <td>${c.avg_lates_per_student}</td>
+        </tr>
+      `).join('');
+    }
+
+    async function renderTop() {
+      // Get all students with late_count, sort desc
+      const res = await API.get('/api/students?limit=500&includeInactive=1');
+      const top = res.items
+        .filter(s => s.late_count > 0)
+        .sort((a, b) => b.late_count - a.late_count)
+        .slice(0, 10);
+      const tbody = document.getElementById('top-tbody');
+      if (!top.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="muted center">No tardiness recorded yet.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = top.map((s, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td><strong>${escapeHtml(s.full_name)}</strong></td>
+          <td>${escapeHtml(s.class)}</td>
+          <td>${lateBadge(s.late_count)}</td>
+        </tr>
+      `).join('');
+    }
+
+    function formatTime(s) {
+      const m = s && s.match(/(\d{2}):(\d{2}):/);
+      return m ? `${m[1]}:${m[2]}` : '';
+    }
+
+    init();
+  </script>
+</body>
+</html>

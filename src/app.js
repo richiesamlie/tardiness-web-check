@@ -1,5 +1,6 @@
 const express = require('express');
 const fs = require('node:fs');
+const path = require('node:path');
 const studentsRouter = require('./routes/students');
 const tardinessRouter = require('./routes/tardiness');
 const statsRouter = require('./routes/stats');
@@ -27,6 +28,20 @@ function createApp({ db = null, dbPath = null } = {}) {
   app.use('/api', dataRouter);
   app.use('/api', backupRouter);
   app.use('/api', diagnosticsRouter);
+
+  // Static files (frontend)
+  app.use(express.static(path.join(__dirname, '..', 'public')));
+
+  // Default route → wizard if not done, tardiness check otherwise
+  app.get('/', (req, res) => {
+    if (db) {
+      try {
+        const completed = db.prepare("SELECT value FROM config WHERE key = 'wizard_completed'").get();
+        if (!completed) return res.redirect('/wizard.html');
+      } catch { /* fall through */ }
+    }
+    res.redirect('/index.html');
+  });
 
   app.get('/api/health', (req, res) => {
     const body = { ok: true, uptimeSeconds: Math.round((Date.now() - startedAt) / 1000) };
