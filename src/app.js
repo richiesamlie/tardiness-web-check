@@ -7,6 +7,7 @@ const configRouter = require('./routes/config');
 const wizardRouter = require('./routes/wizard');
 const dataRouter = require('./routes/data');
 const backupRouter = require('./routes/backup');
+const diagnosticsRouter = require('./routes/diagnostics');
 const { createYearHelper } = require('./lib/year');
 const backupLib = require('./lib/backup');
 
@@ -25,6 +26,7 @@ function createApp({ db = null, dbPath = null } = {}) {
   app.use('/api/wizard', wizardRouter);
   app.use('/api', dataRouter);
   app.use('/api', backupRouter);
+  app.use('/api', diagnosticsRouter);
 
   app.get('/api/health', (req, res) => {
     const body = { ok: true, uptimeSeconds: Math.round((Date.now() - startedAt) / 1000) };
