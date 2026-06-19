@@ -109,10 +109,11 @@ jobs:
 
       - name: Generate release notes
         id: notes
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
         run: |
-          VERSION="${GITHUB_REF_NAME}"
-          VERSION="${VERSION#v}"
-          PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${GITHUB_REF_NAME}$" | head -1 || echo "")
+          TAG="v${VERSION}"
+          PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${TAG}$" | head -1 || echo "")
           if [[ -z "${PREV_TAG}" ]]; then
             PREV_TAG=$(git rev-list --max-parents=0 HEAD | head -1)
             RANGE="${PREV_TAG}..HEAD"
@@ -153,22 +154,24 @@ jobs:
       - name: Create or update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
+          tag_name: v${{ needs.build.outputs.version }}
+          name: v${{ needs.build.outputs.version }}
           body_path: release-notes.md
           draft: false
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: ${{ contains(needs.build.outputs.version, '-') }}
           files: |
             dist/*.zip
             dist/SHA256SUMS
           fail_on_unmatched_files: true
 
       - name: Mark release as latest
-        if: "!contains(github.ref_name, '-')"
+        if: "!contains(needs.build.outputs.version, '-')"
         run: |
           echo "Stable release — GitHub will mark as latest automatically"
 
       - name: Summary
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
         run: |
-          echo "### 🎉 Release ${{ github.ref_name }} published!"
-          echo "→ https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
+          echo "### 🎉 Release v${VERSION} published!"
+          echo "→ https://github.com/${{ github.repository }}/releases/tag/v${VERSION}"
