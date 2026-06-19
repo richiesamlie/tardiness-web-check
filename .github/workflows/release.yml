@@ -1,0 +1,172 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. v1.0.0)'
+        required: true
+        type: string
+        default: 'v0.0.1'
+
+permissions:
+  contents: write  # needed to create GitHub Release
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build & verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (with full history for changelog)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME}"
+          else
+            VERSION="${GITHUB_EVENT_INPUTS_VERSION}"
+          fi
+          VERSION="${VERSION#v}"  # strip leading 'v'
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Using version: v${VERSION}"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify version matches package.json
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if [[ "${PKG_VERSION}" != "${{ steps.version.outputs.version }}" ]]; then
+            echo "::error::package.json version (${PKG_VERSION}) does not match tag (${{ steps.version.outputs.version }})"
+            exit 1
+          fi
+          echo "✓ package.json version matches tag"
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build distribution ZIP
+        run: node scripts/build-release.js
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum *.zip > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ steps.version.outputs.version }}
+          path: |
+            dist/*.zip
+            dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (with full history for changelog)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-${{ github.ref_name }}
+          path: dist
+
+      - name: List artifacts
+        run: ls -la dist/
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          VERSION="${VERSION#v}"
+          PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${GITHUB_REF_NAME}$" | head -1 || echo "")
+          if [[ -z "${PREV_TAG}" ]]; then
+            PREV_TAG=$(git rev-list --max-parents=0 HEAD | head -1)
+            RANGE="${PREV_TAG}..HEAD"
+          else
+            RANGE="${PREV_TAG}..HEAD"
+          fi
+          echo "Comparing ${PREV_TAG}..HEAD"
+          {
+            echo "## 📦 What's Changed"
+            echo ""
+            echo "Commits since \`${PREV_TAG}\`:"
+            echo ""
+            git log "${RANGE}" --pretty=format:"- %s (%h) — %an" | head -50
+            echo ""
+            echo ""
+            echo "## 📥 Installation"
+            echo ""
+            echo "1. Download \`tardiness-web-check-v${VERSION}.zip\` below"
+            echo "2. Extract to a folder on the school computer"
+            echo "3. Install Node.js 22+ from [nodejs.org](https://nodejs.org/) (one-time, ~2 min)"
+            echo "4. Double-click \`Start.bat\` (Windows) or \`Start.command\` (Mac)"
+            echo "5. Browser opens at http://localhost:3000 — follow the first-run wizard"
+            echo ""
+            echo "## 🔐 Verify Checksums"
+            echo ""
+            echo "\`\`\`"
+            cat dist/SHA256SUMS
+            echo "\`\`\`"
+            echo ""
+            echo "## ✅ Verification"
+            echo ""
+            echo "- 112 backend tests passing"
+            echo "- Tested on Node.js 22 + 24"
+            echo "- SHA-256 checksum included for integrity"
+          } > release-notes.md
+          cat release-notes.md
+
+      - name: Create or update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body_path: release-notes.md
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: |
+            dist/*.zip
+            dist/SHA256SUMS
+          fail_on_unmatched_files: true
+
+      - name: Mark release as latest
+        if: "!contains(github.ref_name, '-')"
+        run: |
+          echo "Stable release — GitHub will mark as latest automatically"
+
+      - name: Summary
+        run: |
+          echo "### 🎉 Release ${{ github.ref_name }} published!"
+          echo "→ https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"

@@ -6,8 +6,11 @@
 ![Node: 22+](https://img.shields.io/badge/node-%E2%89%A522-brightgreen)
 ![Tests: 112](https://img.shields.io/badge/tests-112%20passing-success)
 ![Status: Production](https://img.shields.io/badge/status-production-blue)
+![Release: automated](https://img.shields.io/badge/release-automated-blueviolet)
 
 Built for schools that need a **simple, private, easy-to-operate** way to track student lateness — without cloud subscriptions, mobile apps, or IT support.
+
+> 📥 **[Download the latest release](https://github.com/richiesamlie/tardiness-web-check/releases/latest)** — extract, double-click `Start.bat`, follow the wizard. Done.
 
 The app runs on a single computer at your school, displays on any tablet/phone/laptop on the same Wi-Fi, and stores all data in a single SQLite file you can back up with a copy-paste.
 
@@ -197,6 +200,44 @@ tardiness-web-check/
     ├── VIDEO_SCRIPT.md          ← walkthrough video script
     └── *.md                     ← implementation plans and specs
 ```
+
+---
+
+## 📦 Releases
+
+Pre-built distribution ZIPs are published automatically:
+
+**👉 [Latest release](https://github.com/richiesamlie/tardiness-web-check/releases/latest)**
+
+Each release includes:
+
+| File | Purpose |
+|---|---|
+| `tardiness-web-check-vX.Y.Z.zip` | The full app, ready to extract and run |
+| `SHA256SUMS` | Checksum to verify the ZIP integrity |
+
+### Verify a download
+
+```bash
+# macOS / Linux
+shasum -a 256 tardiness-web-check-v1.0.0.zip
+```
+
+```powershell
+# Windows PowerShell
+Get-FileHash tardiness-web-check-v1.0.0.zip -Algorithm SHA256
+```
+
+Compare against the `SHA256SUMS` file in the release.
+
+### How releases work
+
+- **Triggered by** pushing a tag matching `v*` (e.g. `v1.0.0`)
+- **Automated by** `.github/workflows/release.yml`
+- **Steps**: tests run → distribution built → SHA-256 generated → GitHub Release created → ZIP + checksums attached
+- **Manual trigger** available via the Actions tab → Release → Run workflow
+
+For maintainers: see [`docs/RELEASING.md`](docs/RELEASING.md) for the full release process.
 
 ---
 
