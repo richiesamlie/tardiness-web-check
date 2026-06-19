@@ -1,9 +1,13 @@
 // Centralized config loader.
-// Reads once at startup; can be overridden via environment variables.
+// Reads once at startup; can be overridden via (in priority order):
+//   1. Environment variable  (e.g. PORT=8080 node src/server.js)
+//   2. data/.port file       (e.g. "8080" — edit-friendly for non-IT admins)
+//   3. Built-in default
 // No secrets live here — for v1, everything is local & non-secret.
 
 'use strict';
 
+const fs = require('node:fs');
 const path = require('node:path');
 
 function parseInt10(value, def) {
@@ -19,9 +23,24 @@ function parseBool(value, def = false) {
   return def;
 }
 
+// Read port from env var, then data/.port file, then default.
+// data/.port is the user-friendly knob for non-IT admins — see data/.port.example.
+function resolvePort() {
+  if (process.env.PORT) return parseInt10(process.env.PORT, 3000);
+  try {
+    const portFile = path.join(__dirname, '..', 'data', '.port');
+    if (fs.existsSync(portFile)) {
+      const contents = fs.readFileSync(portFile, 'utf8').trim();
+      const n = parseInt(contents, 10);
+      if (Number.isFinite(n) && n > 0 && n < 65536) return n;
+    }
+  } catch { /* ignore — fall through to default */ }
+  return 3000;
+}
+
 const config = {
   // Server
-  port: parseInt10(process.env.PORT, 3000),
+  port: resolvePort(),
   host: process.env.HOST || '0.0.0.0',
   nodeEnv: process.env.NODE_ENV || 'development',
 

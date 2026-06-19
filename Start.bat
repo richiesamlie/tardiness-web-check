@@ -44,8 +44,20 @@ if not exist "node_modules" (
     echo.
 )
 
+REM --- Determine port ---
+REM   Priority:  1. PORT env var   2. data\.port file   3. default 3000
+REM   Edit data\.port to change the port (just the number, e.g. 8080)
+if not "%PORT%"=="" (
+    set "APP_PORT=%PORT%"
+) else if exist "data\.port" (
+    set /p APP_PORT=<"data\.port"
+    if "%APP_PORT%"=="" set "APP_PORT=3000"
+) else (
+    set "APP_PORT=3000"
+)
+
 REM --- Open browser after a short delay (in background) ---
-start "" /min cmd /c "timeout /t 3 /nobreak >nul && start http://localhost:3000"
+start "" /min cmd /c "timeout /t 3 /nobreak >nul && start http://localhost:%APP_PORT%"
 
 echo.
 echo ============================================
@@ -53,13 +65,18 @@ echo   Tardiness Check Server
 echo ============================================
 echo.
 echo   When ready, your browser will open at:
-echo   http://localhost:3000
+echo   http://localhost:%APP_PORT%
+echo.
+echo   To change the port:
+echo     - Edit data\.port (just put a number, like 8080)
+echo     - Or set PORT=8080 before running this script
 echo.
 echo   To stop the server: press Ctrl+C
 echo.
 echo ============================================
 echo.
 
+set "PORT=%APP_PORT%"
 node --no-warnings src\server.js
 
 echo.

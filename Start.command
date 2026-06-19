@@ -32,20 +32,38 @@ if [ ! -d "node_modules" ]; then
   fi
 fi
 
+# Determine port
+#   Priority:  1. PORT env var   2. data/.port file   3. default 3000
+#   Edit data/.port to change the port (just the number, e.g. 8080)
+if [ -n "$PORT" ]; then
+  APP_PORT="$PORT"
+elif [ -f "data/.port" ]; then
+  APP_PORT=$(cat "data/.port" | tr -d '[:space:]')
+  if [ -z "$APP_PORT" ]; then APP_PORT="3000"; fi
+else
+  APP_PORT="3000"
+fi
+
 # Open browser after a short delay (in background)
-(sleep 3 && open "http://localhost:3000") &
+(sleep 3 && open "http://localhost:${APP_PORT}") &
 
 echo ""
 echo "============================================"
 echo "  Tardiness Check Server"
 echo "============================================"
 echo ""
-echo "  Browser will open at: http://localhost:3000"
+echo "  Browser will open at: http://localhost:${APP_PORT}"
+echo ""
+echo "  To change the port:"
+echo "    - Edit data/.port (just put a number, like 8080)"
+echo "    - Or set PORT=8080 before running this script"
+echo ""
 echo "  To stop: press Ctrl+C"
 echo ""
 echo "============================================"
 echo ""
 
+export PORT="$APP_PORT"
 node --no-warnings src/server.js
 
 echo ""

@@ -275,13 +275,26 @@ Runs 112 backend tests in <5 seconds. Tests cover:
 | **Express 4** | Battle-tested, minimal, perfect for this use case |
 | **No PWA, no SPA, no service worker** | Keeps it simple. Tablets just bookmark the URL. |
 
+### Changing the port
+
+The server defaults to **port 3000**. Three ways to change it (in priority order):
+
+| Method | How | Best for |
+|---|---|---|
+| **Environment variable** | `set PORT=8080` then run `Start.bat` (Windows) / `PORT=8080 ./Start.command` (Mac) | Power users, one-off runs |
+| **Edit `data/.port`** | Create `data/.port` containing just the port number (e.g. `8080`). See `data/.port.example` for instructions. | **Non-IT admins** — edit a text file, no terminal needed |
+| **Default** | No config — uses 3000 | Out-of-the-box setup |
+
+After editing `data/.port`, restart the server (`Ctrl+C` in the Start.bat window, then double-click again). The browser will open on the new port.
+
 ### Environment variables
 
 All optional. The app works without any of these.
 
 | Var | Default | What |
 |---|---|---|
-| `PORT` | `3000` | HTTP port |
+| `PORT` | `3000` (or `data/.port`) | HTTP port |
+| `HOST` | `0.0.0.0` | Bind address |
 | `NODE_ENV` | `development` | `production` hides error stacks in responses |
 | `DB_PATH` | `data/tardiness.db` | SQLite file location |
 | `RATE_LIMIT_GENERAL` | `600` | Reqs/15min per IP for non-PIN endpoints |

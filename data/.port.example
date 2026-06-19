@@ -1,0 +1,21 @@
+# How to change the port
+# ======================
+#
+# The Tardiness Check server defaults to port 3000.
+# To use a different port, edit THIS FILE and put just the port number.
+# Example: change 3000 to 8080 to make the server run on http://localhost:8080
+#
+# After editing this file:
+#   1. Stop the server (Ctrl+C in the Start.bat window)
+#   2. Double-click Start.bat again
+#   3. The browser will open on the new port
+#
+# Alternative: set the PORT environment variable before running Start.bat
+# Example (in a terminal):  set PORT=8080  (then run Start.bat)
+#
+# Why change the port?
+#   - Another app on your school PC is using port 3000
+#   - Your IT department requires a specific port
+#   - You're running multiple instances
+#
+3000

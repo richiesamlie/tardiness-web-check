@@ -4,6 +4,8 @@ data/*.db-journal
 data/*.db-wal
 data/*.db-shm
 data/backups/
+data/uploads/
+data/.port
 dist/
 *.log
 .DS_Store
