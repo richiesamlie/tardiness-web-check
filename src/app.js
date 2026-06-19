@@ -1,6 +1,8 @@
 const express = require('express');
 const fs = require('node:fs');
 const studentsRouter = require('./routes/students');
+const tardinessRouter = require('./routes/tardiness');
+const statsRouter = require('./routes/stats');
 
 function createApp({ db = null } = {}) {
   const app = express();
@@ -9,6 +11,8 @@ function createApp({ db = null } = {}) {
 
   app.use(express.json());
   app.use('/api/students', studentsRouter);
+  app.use('/api/tardiness', tardinessRouter);
+  app.use('/api/stats', statsRouter);
 
   app.get('/api/health', (req, res) => {
     const body = {
